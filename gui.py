@@ -23,6 +23,7 @@ from main import gen_colors, get_wallpaper, home
 
 KV = '''
 <BorderCard@MDCard>:
+    radius: [0, 0, 0, 0]
     canvas.before:
         Color:
             rgba: app.border_color
@@ -52,27 +53,24 @@ MDScreen:
                 elevation: 0
                 md_bg_color: app.bg_color
 
-                MDCard:
+                FloatLayout:
                     size_hint_y: None
                     height: dp(195)
-                    md_bg_color: 0.04, 0.04, 0.04, 1
-                    elevation: 0
 
-                    MDBoxLayout:
-                        orientation: 'vertical'
+                    Image:
+                        id: image_preview
+                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        size_hint: None, None
+                        allow_stretch: True
+                        keep_ratio: True
 
-                        Image:
-                            id: image_preview
-                            size_hint: 1, 1
-                            allow_stretch: True
-                            keep_ratio: True
-
-                        MDLabel:
-                            id: loading_text
-                            text: "Loading..."
-                            halign: "center"
-                            theme_text_color: "Custom"
-                            text_color: 0.5, 0.5, 0.5, 1
+                    MDLabel:
+                        id: loading_text
+                        text: "Loading..."
+                        halign: "center"
+                        valign: "middle"
+                        theme_text_color: "Custom"
+                        text_color: 0.5, 0.5, 0.5, 1
 
             # Image Adjustments Section
             BorderCard:
@@ -215,6 +213,7 @@ MDScreen:
                             on_release: app.select_image()
                             size_hint_x: None
                             width: dp(180)
+                            radius: [0, 0, 0, 0]
 
                         MDRaisedButton:
                             text: "GENERATE COLORS"
@@ -222,6 +221,7 @@ MDScreen:
                             on_release: app.generate_colors()
                             size_hint_x: None
                             width: dp(180)
+                            radius: [0, 0, 0, 0]
 
                         Widget:
 '''
@@ -237,6 +237,7 @@ class ColorBox(MDCard):
         self.height = 60
         self.md_bg_color = self.hex_to_rgb(color_value)
         self.elevation = 0
+        self.radius = [0, 0, 0, 0]
 
         # Add label
         label = MDLabel(
@@ -396,8 +397,8 @@ class PrismaApp(MDApp):
             # Open and resize image
             img = PILImage.open(image_path)
 
-            # Calculate aspect ratio and resize
-            max_width, max_height = 400, 200
+            # Calculate aspect ratio and resize to fill preview area
+            max_width, max_height = 850, 195
             img.thumbnail((max_width, max_height), PILImage.Resampling.LANCZOS)
 
             # Store original image for later adjustments
@@ -443,8 +444,22 @@ class PrismaApp(MDApp):
             texture.blit_buffer(data, colorfmt='rgb', bufferfmt='ubyte')
             texture.flip_vertical()
 
-            # Update image widget
-            self.screen.ids.image_preview.texture = texture
+            # Update image widget and size to fill container
+            image_widget = self.screen.ids.image_preview
+            image_widget.texture = texture
+
+            # Calculate size to fill the container (850x195 with padding)
+            container_width = 850
+            container_height = 195
+            img_width, img_height = img.size
+
+            # Calculate scale to fill container
+            scale_w = container_width / img_width
+            scale_h = container_height / img_height
+            scale = max(scale_w, scale_h)  # Use max to fill
+
+            # Set image size
+            image_widget.size = (img_width * scale, img_height * scale)
 
         except Exception as e:
             print(f"Error updating preview: {e}")
