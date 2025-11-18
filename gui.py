@@ -1001,6 +1001,13 @@ HTML = """
                     button.onclick = () => toggleWSL(button);
                     templateButtons.appendChild(button);
                 }
+
+                // Apply current theme colors to newly created buttons
+                console.log('Template buttons created, applying theme colors...');
+                const fg = currentColors.foreground || '#808080';
+                const accent = currentColors.color4 || '#5588dd';
+                const fgDark = darkenColor(fg, 0.7);
+                updateButtonColors(fgDark, accent);
             } catch (e) {
                 console.error('Error loading template buttons:', e);
             }
