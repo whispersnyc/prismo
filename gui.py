@@ -12,6 +12,8 @@ class PrismaAPI:
 
     def __init__(self):
         self.current_image_path = None
+        self.default_wallpaper_path = None  # Track default wallpaper for reset
+        self.custom_image_loaded = False  # Track if custom image was loaded
         self.light_mode = False
         self.colors = {}
         self.saturation = 50
@@ -65,6 +67,8 @@ class PrismaAPI:
                 if path.isfile(wallpaper_path):
                     print(f"Wallpaper file found, loading: {wallpaper_path}")
                     self.current_image_path = wallpaper_path
+                    self.default_wallpaper_path = wallpaper_path  # Store default for reset
+                    self.custom_image_loaded = False
                     return self.get_image_base64(wallpaper_path)
                 else:
                     print(f"Wallpaper file not found at: {wallpaper_path}")
@@ -133,8 +137,25 @@ class PrismaAPI:
         if result and len(result) > 0:
             file_path = result[0]
             self.current_image_path = file_path
+            self.custom_image_loaded = True  # Mark that custom image was loaded
             return self.get_image_base64(file_path)
         return None
+
+    def reset_image(self):
+        """Reset to default wallpaper"""
+        if self.default_wallpaper_path and path.isfile(self.default_wallpaper_path):
+            self.current_image_path = self.default_wallpaper_path
+            self.custom_image_loaded = False
+            return self.get_image_base64(self.default_wallpaper_path)
+        return None
+
+    def has_default_wallpaper(self):
+        """Check if default wallpaper was loaded"""
+        return self.default_wallpaper_path is not None and path.isfile(self.default_wallpaper_path)
+
+    def is_custom_image_loaded(self):
+        """Check if custom image is loaded"""
+        return self.custom_image_loaded
 
     def update_saturation(self, value):
         """Update saturation value"""
@@ -229,13 +250,53 @@ HTML = """
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: #000000;
             color: #808080;
-            overflow-y: auto;
+            overflow: hidden;
+            height: 100vh;
         }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
+        .main-container {
+            display: flex;
+            height: 100vh;
+            gap: 20px;
             padding: 20px;
+        }
+
+        /* Left side - Color Palette */
+        .left-section {
+            flex-shrink: 0;
+            width: 280px;
+        }
+
+        .palette-panel {
+            background: #000000;
+            border: 1px solid #808080;
+            padding: 20px;
+            height: 100%;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            height: 100%;
+        }
+
+        .color-box {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 500;
+            cursor: default;
+            border: 1px solid rgba(128, 128, 128, 0.3);
+        }
+
+        /* Right side - Scrollable panels */
+        .right-section {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .panel {
@@ -243,6 +304,11 @@ HTML = """
             border: 1px solid #808080;
             padding: 20px;
             margin-bottom: 20px;
+        }
+
+        /* Image Preview Panel */
+        .image-panel {
+            position: relative;
         }
 
         .image-preview {
@@ -266,6 +332,33 @@ HTML = """
             font-size: 14px;
         }
 
+        .image-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(51, 51, 51, 0.8);
+            border: 1px solid #808080;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .image-button:hover {
+            background: rgba(85, 136, 221, 0.8);
+            transform: scale(1.05);
+        }
+
+        .image-button:active {
+            transform: scale(0.95);
+        }
+
+        /* Sliders */
         .slider-group {
             margin-bottom: 20px;
         }
@@ -300,7 +393,7 @@ HTML = """
             appearance: none;
             width: 16px;
             height: 16px;
-            background: #5588dd;
+            background: #808080;
             cursor: pointer;
             border-radius: 50%;
         }
@@ -308,51 +401,17 @@ HTML = """
         input[type="range"]::-moz-range-thumb {
             width: 16px;
             height: 16px;
-            background: #5588dd;
+            background: #808080;
             cursor: pointer;
             border-radius: 50%;
             border: none;
         }
 
-        .color-grid {
-            display: grid;
-            grid-template-columns: repeat(9, 1fr);
-            gap: 6px;
-        }
-
-        .color-box {
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            font-weight: 500;
-            cursor: default;
-        }
-
+        /* Controls */
         .controls {
             display: flex;
             flex-direction: column;
             gap: 15px;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .checkbox-group input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .checkbox-group label {
-            font-size: 14px;
-            cursor: pointer;
-            user-select: none;
         }
 
         .button-group {
@@ -365,28 +424,48 @@ HTML = """
             padding: 12px 32px;
             font-size: 14px;
             font-weight: 600;
-            border: none;
+            border: 1px solid #808080;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.2s;
             letter-spacing: 0.5px;
         }
 
         button:hover {
             opacity: 0.8;
+            transform: translateY(-1px);
         }
 
         button:active {
             opacity: 0.6;
+            transform: translateY(0);
         }
 
-        .btn-secondary {
+        .btn-toggle {
+            background: #1a1a1a;
+            color: #808080;
+            position: relative;
+        }
+
+        .btn-toggle.active {
             background: #333333;
             color: #ffffff;
+            border-color: #5588dd;
+        }
+
+        .btn-toggle::before {
+            content: '○';
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        .btn-toggle.active::before {
+            content: '●';
         }
 
         .btn-primary {
             background: #5588dd;
             color: #ffffff;
+            border-color: #5588dd;
         }
 
         .message {
@@ -412,49 +491,50 @@ HTML = """
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Image Preview -->
-        <div class="panel">
-            <div class="image-preview" id="imagePreview">
-                <div class="placeholder">Loading...</div>
+    <div class="main-container">
+        <!-- Left Section - Color Palette -->
+        <div class="left-section">
+            <div class="palette-panel">
+                <div class="color-grid" id="colorGrid"></div>
             </div>
         </div>
 
-        <!-- Adjustments -->
-        <div class="panel">
-            <div class="slider-group">
-                <div class="slider-label">
-                    <span>Saturation</span>
-                    <span class="slider-value" id="saturationValue">50</span>
+        <!-- Right Section - Scrollable Panels -->
+        <div class="right-section">
+            <!-- Image Preview -->
+            <div class="panel image-panel">
+                <button class="image-button" id="imageButton" onclick="handleImageButton()" title="Select Image">📁</button>
+                <div class="image-preview" id="imagePreview">
+                    <div class="placeholder">Loading...</div>
                 </div>
-                <input type="range" id="saturationSlider" min="0" max="100" value="50" step="1">
             </div>
 
-            <div class="slider-group">
-                <div class="slider-label">
-                    <span>Contrast</span>
-                    <span class="slider-value" id="contrastValue">50</span>
+            <!-- Adjustments -->
+            <div class="panel">
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Saturation</span>
+                        <span class="slider-value" id="saturationValue">50</span>
+                    </div>
+                    <input type="range" id="saturationSlider" min="0" max="100" value="50" step="1">
                 </div>
-                <input type="range" id="contrastSlider" min="0" max="100" value="50" step="1">
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Contrast</span>
+                        <span class="slider-value" id="contrastValue">50</span>
+                    </div>
+                    <input type="range" id="contrastSlider" min="0" max="100" value="50" step="1">
+                </div>
             </div>
-        </div>
 
-        <!-- Color Palette -->
-        <div class="panel">
-            <div class="color-grid" id="colorGrid"></div>
-        </div>
-
-        <!-- Controls -->
-        <div class="panel">
-            <div class="controls">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="lightModeCheckbox">
-                    <label for="lightModeCheckbox">Light Mode Color Scheme</label>
-                </div>
-
-                <div class="button-group">
-                    <button class="btn-secondary" onclick="selectImage()">SELECT IMAGE</button>
-                    <button class="btn-primary" onclick="generateColors()">GENERATE COLORS</button>
+            <!-- Controls -->
+            <div class="panel">
+                <div class="controls">
+                    <div class="button-group">
+                        <button class="btn-toggle" id="lightModeButton" onclick="toggleLightMode()">LIGHT MODE</button>
+                        <button class="btn-primary" onclick="generateColors()">GENERATE COLORS</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -469,13 +549,17 @@ HTML = """
         let contrastValue = document.getElementById('contrastValue');
         let imagePreview = document.getElementById('imagePreview');
         let colorGrid = document.getElementById('colorGrid');
-        let lightModeCheckbox = document.getElementById('lightModeCheckbox');
+        let lightModeButton = document.getElementById('lightModeButton');
+        let imageButton = document.getElementById('imageButton');
+        let isLightMode = false;
+        let currentColors = {};
 
         // Initialize - wait for pywebview to be ready
         window.addEventListener('pywebviewready', async function() {
             console.log('pywebview is ready, initializing...');
             await loadColors();
             await loadWallpaper();
+            await updateImageButton();
         });
 
         // Load colors from backend
@@ -484,6 +568,7 @@ HTML = """
                 console.log('Loading colors from backend...');
                 const colors = await pywebview.api.get_colors();
                 console.log('Colors loaded:', colors);
+                currentColors = colors;
                 updateColorGrid(colors);
                 updateTheme(colors);
             } catch (e) {
@@ -509,34 +594,49 @@ HTML = """
             }
         }
 
-        // Update color grid
+        // Update color grid with 2-column layout
         function updateColorGrid(colors) {
-            const colorNames = [
-                'background', 'foreground',
-                'color0', 'color1', 'color2', 'color3',
-                'color4', 'color5', 'color6', 'color7',
-                'color8', 'color9', 'color10', 'color11',
-                'color12', 'color13', 'color14', 'color15'
-            ];
+            // Column 1: background, color0, color2, color4, color6, color8, color10, color12, color14
+            // Column 2: foreground, color1, color3, color5, color7, color9, color11, color13, color15
+            const column1 = ['background', 'color0', 'color2', 'color4', 'color6', 'color8', 'color10', 'color12', 'color14'];
+            const column2 = ['foreground', 'color1', 'color3', 'color5', 'color7', 'color9', 'color11', 'color13', 'color15'];
 
             colorGrid.innerHTML = '';
-            colorNames.forEach(name => {
-                const color = colors[name] || '#808080';
-                const box = document.createElement('div');
-                box.className = 'color-box';
-                box.style.backgroundColor = color;
-                box.textContent = name;
 
-                // Calculate contrast color for text
-                const rgb = parseInt(color.slice(1), 16);
-                const r = (rgb >> 16) & 0xff;
-                const g = (rgb >> 8) & 0xff;
-                const b = rgb & 0xff;
-                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-                box.style.color = luminance > 0.5 ? '#000000' : '#ffffff';
+            // Interleave columns for grid layout
+            const maxLength = Math.max(column1.length, column2.length);
+            for (let i = 0; i < maxLength; i++) {
+                // Add column 1 item
+                if (i < column1.length) {
+                    const name = column1[i];
+                    const color = colors[name] || '#808080';
+                    colorGrid.appendChild(createColorBox(name, color));
+                }
 
-                colorGrid.appendChild(box);
-            });
+                // Add column 2 item
+                if (i < column2.length) {
+                    const name = column2[i];
+                    const color = colors[name] || '#808080';
+                    colorGrid.appendChild(createColorBox(name, color));
+                }
+            }
+        }
+
+        function createColorBox(name, color) {
+            const box = document.createElement('div');
+            box.className = 'color-box';
+            box.style.backgroundColor = color;
+            box.textContent = name;
+
+            // Calculate contrast color for text
+            const rgb = parseInt(color.slice(1), 16);
+            const r = (rgb >> 16) & 0xff;
+            const g = (rgb >> 8) & 0xff;
+            const b = rgb & 0xff;
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            box.style.color = luminance > 0.5 ? '#000000' : '#ffffff';
+
+            return box;
         }
 
         // Update theme colors
@@ -548,12 +648,13 @@ HTML = """
             document.body.style.backgroundColor = bg;
             document.body.style.color = fg;
 
-            document.querySelectorAll('.panel').forEach(panel => {
+            // Update panels
+            document.querySelectorAll('.panel, .palette-panel').forEach(panel => {
                 panel.style.backgroundColor = bg;
                 panel.style.borderColor = fg;
             });
 
-            document.querySelectorAll('.slider-label, .checkbox-group label').forEach(el => {
+            document.querySelectorAll('.slider-label').forEach(el => {
                 el.style.color = fg;
             });
 
@@ -561,12 +662,91 @@ HTML = """
                 el.style.backgroundColor = bg;
             });
 
-            document.querySelectorAll('input[type="range"]::-webkit-slider-thumb').forEach(el => {
-                el.style.background = accent;
-            });
+            // Update slider thumbs to use foreground color
+            updateSliderThumbColor(fg);
 
             // Update button primary color
             document.querySelector('.btn-primary').style.backgroundColor = accent;
+        }
+
+        // Update slider thumb color dynamically
+        function updateSliderThumbColor(color) {
+            // Create or update style element for slider thumbs
+            let styleId = 'slider-thumb-style';
+            let styleEl = document.getElementById(styleId);
+
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+
+            styleEl.textContent = `
+                input[type="range"]::-webkit-slider-thumb {
+                    background: ${color} !important;
+                }
+                input[type="range"]::-moz-range-thumb {
+                    background: ${color} !important;
+                }
+            `;
+        }
+
+        // Update image button based on state
+        async function updateImageButton() {
+            try {
+                const hasDefault = await pywebview.api.has_default_wallpaper();
+                const isCustom = await pywebview.api.is_custom_image_loaded();
+
+                if (isCustom && hasDefault) {
+                    // Show reset icon
+                    imageButton.textContent = '↺';
+                    imageButton.title = 'Reset to Default Wallpaper';
+                } else {
+                    // Show file selector icon
+                    imageButton.textContent = '📁';
+                    imageButton.title = 'Select Image';
+                }
+            } catch (e) {
+                console.error('Error updating image button:', e);
+            }
+        }
+
+        // Handle image button click
+        async function handleImageButton() {
+            try {
+                const isCustom = await pywebview.api.is_custom_image_loaded();
+                const hasDefault = await pywebview.api.has_default_wallpaper();
+
+                if (isCustom && hasDefault) {
+                    // Reset to default
+                    const imageData = await pywebview.api.reset_image();
+                    if (imageData) {
+                        imagePreview.innerHTML = '<img src="' + imageData + '">';
+                        await updateImageButton();
+                    }
+                } else {
+                    // Select new image
+                    const imageData = await pywebview.api.select_image();
+                    if (imageData) {
+                        imagePreview.innerHTML = '<img src="' + imageData + '">';
+                        await updateImageButton();
+                    }
+                }
+            } catch (e) {
+                console.error('Error handling image button:', e);
+            }
+        }
+
+        // Toggle light mode
+        function toggleLightMode() {
+            isLightMode = !isLightMode;
+            pywebview.api.toggle_light_mode(isLightMode);
+
+            if (isLightMode) {
+                lightModeButton.classList.add('active');
+            } else {
+                lightModeButton.classList.remove('active');
+            }
         }
 
         // Saturation slider
@@ -587,28 +767,12 @@ HTML = """
             }
         });
 
-        // Light mode checkbox
-        lightModeCheckbox.addEventListener('change', function() {
-            pywebview.api.toggle_light_mode(this.checked);
-        });
-
-        // Select image
-        async function selectImage() {
-            try {
-                const imageData = await pywebview.api.select_image();
-                if (imageData) {
-                    imagePreview.innerHTML = '<img src="' + imageData + '">';
-                }
-            } catch (e) {
-                console.error('Error selecting image:', e);
-            }
-        }
-
         // Generate colors
         async function generateColors() {
             try {
                 const result = await pywebview.api.generate_colors();
                 if (result.success) {
+                    currentColors = result.colors;
                     updateColorGrid(result.colors);
                     updateTheme(result.colors);
                     showMessage('Colors generated successfully!', 'success');
