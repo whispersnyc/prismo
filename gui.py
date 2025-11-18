@@ -820,60 +820,61 @@ HTML = """
             updateButtonColors(fg, accent);
         }
 
-        // Update button colors directly
+        // Update button colors by injecting CSS rules
         function updateButtonColors(fg, accent) {
             console.log('=== updateButtonColors called ===');
             console.log('fg:', fg, 'accent:', accent);
 
-            // Update template/integration buttons
-            const templateBtns = document.querySelectorAll('.btn-template');
-            console.log('Found', templateBtns.length, 'template buttons');
-            templateBtns.forEach((btn, index) => {
-                const isActive = btn.classList.contains('active');
-                console.log(`Template button ${index}: active=${isActive}`);
-                if (!isActive) {
-                    btn.style.color = fg;
-                    btn.style.borderColor = fg;
-                    console.log(`  Set color to ${fg}`);
-                } else {
-                    btn.style.borderColor = accent;
-                    console.log(`  Set border to ${accent} (active)`);
-                }
-            });
-
-            // Update toggle buttons (light mode)
-            const toggleBtns = document.querySelectorAll('.btn-toggle');
-            console.log('Found', toggleBtns.length, 'toggle buttons');
-            toggleBtns.forEach((btn, index) => {
-                const isActive = btn.classList.contains('active');
-                console.log(`Toggle button ${index}: active=${isActive}`);
-                if (!isActive) {
-                    btn.style.color = fg;
-                    btn.style.borderColor = fg;
-                    console.log(`  Set color to ${fg}`);
-                } else {
-                    btn.style.borderColor = accent;
-                    console.log(`  Set border to ${accent} (active)`);
-                }
-            });
-
-            // Update icon buttons (settings, file selector)
-            const iconBtns = document.querySelectorAll('.btn-icon');
-            console.log('Found', iconBtns.length, 'icon buttons');
-            iconBtns.forEach((btn, index) => {
-                btn.style.color = fg;
-                btn.style.borderColor = fg;
-                console.log(`Icon button ${index}: Set color to ${fg}`);
-            });
-
-            // Update image button
-            const imageBtn = document.getElementById('imageButton');
-            console.log('Image button found:', !!imageBtn);
-            if (imageBtn) {
-                imageBtn.style.color = fg;
-                imageBtn.style.borderColor = fg;
-                console.log(`Image button: Set color to ${fg}`);
+            // Remove existing dynamic style tag if present
+            const existingStyle = document.getElementById('dynamic-button-styles');
+            if (existingStyle) {
+                existingStyle.remove();
             }
+
+            // Create new style tag with dynamic CSS rules
+            const styleTag = document.createElement('style');
+            styleTag.id = 'dynamic-button-styles';
+            styleTag.textContent = `
+                /* Template and integration buttons - inactive state */
+                .btn-template:not(.active) {
+                    color: ${fg} !important;
+                    border-color: ${fg} !important;
+                }
+
+                /* Template and integration buttons - active state */
+                .btn-template.active {
+                    border-color: ${accent} !important;
+                }
+
+                /* Toggle buttons - inactive state */
+                .btn-toggle:not(.active) {
+                    color: ${fg} !important;
+                    border-color: ${fg} !important;
+                }
+
+                /* Toggle buttons - active state */
+                .btn-toggle.active {
+                    border-color: ${accent} !important;
+                }
+
+                /* Icon buttons */
+                .btn-icon {
+                    color: ${fg} !important;
+                    border-color: ${fg} !important;
+                }
+
+                /* Image button */
+                .image-button {
+                    color: ${fg} !important;
+                    border-color: ${fg} !important;
+                }
+            `;
+
+            document.head.appendChild(styleTag);
+            console.log('Dynamic CSS rules injected successfully');
+            console.log('Template buttons:', document.querySelectorAll('.btn-template').length);
+            console.log('Toggle buttons:', document.querySelectorAll('.btn-toggle').length);
+            console.log('Icon buttons:', document.querySelectorAll('.btn-icon').length);
         }
 
         // Darken a hex color by a factor (0-1, where 1 is original brightness)
