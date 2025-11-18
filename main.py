@@ -161,24 +161,33 @@ def main(test_args=None, test_config=None):
             help="generate colors and format JSON only, skip config-based templates and WSL")
     parser.add_argument("-lm", "--light-mode", action="store_true",
             help="generate light mode color scheme instead of dark mode")
+    parser.add_argument("filepath", nargs="?", default=None,
+            help="optional path to image file (if not provided, uses current wallpaper)")
     args = parser.parse_args(test_args)
 
     # determine light mode: flag takes priority over config, default to False
     light_mode = args.light_mode if args.light_mode else config.get("light_mode", False)
 
-    # get current wallpaper
-    try:
-        current_wal = get_wallpaper()
-        print("Current wallpaper: " + current_wal)
-    except Exception as e:
-        # fallback to TranscodedWallpaper if binary fails
-        current_wal = home+"/AppData/Roaming/Microsoft/Windows/Themes/TranscodedWallpaper"
-        print("Using fallback wallpaper path: " + current_wal)
-
-        # check if fallback file exists
+    # use provided filepath or get current wallpaper
+    if args.filepath:
+        current_wal = args.filepath
         if not path.isfile(current_wal):
-            fatal("Could not detect wallpaper and fallback file doesn't exist.\n"
-                  "Please set a wallpaper in Windows settings first.")
+            fatal("Provided image file does not exist: " + current_wal)
+        print("Using provided image: " + current_wal)
+    else:
+        # get current wallpaper
+        try:
+            current_wal = get_wallpaper()
+            print("Current wallpaper: " + current_wal)
+        except Exception as e:
+            # fallback to TranscodedWallpaper if binary fails
+            current_wal = home+"/AppData/Roaming/Microsoft/Windows/Themes/TranscodedWallpaper"
+            print("Using fallback wallpaper path: " + current_wal)
+
+            # check if fallback file exists
+            if not path.isfile(current_wal):
+                fatal("Could not detect wallpaper and fallback file doesn't exist.\n"
+                      "Please set a wallpaper in Windows settings first.")
 
     # generate colors and apply config
     try:
