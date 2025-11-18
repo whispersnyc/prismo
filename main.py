@@ -50,13 +50,15 @@ class Parser(argparse.ArgumentParser):
         fatal("error: "+message, self)
 
 
-def gen_colors(img, apply_config=True, light_mode=False):
+def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=None):
     """Generates color scheme from image and applies to templates.
 
     Parameters:
         img (string): path leading to input image
         apply_config (bool): whether to apply templates and WSL config
         light_mode (bool): generate light mode color scheme
+        templates (set): specific templates to apply (None = all from config)
+        wsl (bool): whether to apply WSL (None = use config)
     """
 
     # get/create color scheme
@@ -90,16 +92,24 @@ def gen_colors(img, apply_config=True, light_mode=False):
         return
 
     # WSL / wpgtk
-    if config.get("wsl"): # wpgtk
-        wsl = "wsl -d " + config["wsl"]
-        wsl_img = convert(img)
-        Popen(wsl + " -- wpg -s \"%s\"" % wsl_img, shell=True)
-        img_name = wsl_img.replace("/", "_").replace(" ", "\\ ")
-        Popen(wsl + " -- rm ~/.config/wpg/schemes/" + img_name[:img_name.rfind('.')] + '*', shell=True)
-        print("Applied WSL wpgtk theme")
+    apply_wsl = wsl if wsl is not None else config.get("wsl")
+    if apply_wsl: # wpgtk
+        wsl_distro = apply_wsl if isinstance(apply_wsl, str) else config.get("wsl")
+        if wsl_distro:
+            wsl_cmd = "wsl -d " + wsl_distro
+            wsl_img = convert(img)
+            Popen(wsl_cmd + " -- wpg -s \"%s\"" % wsl_img, shell=True)
+            img_name = wsl_img.replace("/", "_").replace(" ", "\\ ")
+            Popen(wsl_cmd + " -- rm ~/.config/wpg/schemes/" + img_name[:img_name.rfind('.')] + '*', shell=True)
+            print("Applied WSL wpgtk theme")
 
     # apply templates
-    for (base_name,output) in config.get("templates", {}).items():
+    templates_to_apply = templates if templates is not None else config.get("templates", {}).keys()
+    for base_name in templates_to_apply:
+        output = config.get("templates", {}).get(base_name)
+        if not output:
+            print("Skipped %s template (not found in config)" % base_name)
+            continue
         if not path.exists(template := (template_path+'/'+base_name)):
             print("Skipped %s template (either template file or output folder is missing)" % base_name)
             continue
@@ -179,9 +189,36 @@ def main(test_args=None, test_config=None):
             help="generate colors and format JSON only, skip config-based templates and WSL")
     parser.add_argument("-lm", "--light-mode", action="store_true",
             help="generate light mode color scheme instead of dark mode")
+    parser.add_argument("-t", "--templates", nargs="?", const="__list__", default=None,
+            help="apply specific templates (comma-separated list, e.g., 'discord.txt,obsidian.txt'). "
+                 "If no list provided, prints available templates and config path, then exits")
+    parser.add_argument("-w", "--wsl", nargs="?", const="__config__", default=None,
+            help="apply WSL/wpgtk theme. Optionally specify WSL distro name. "
+                 "If no name provided, uses config value")
     parser.add_argument("filepath", nargs="?", default=None,
             help="optional path to image file (if not provided, uses current wallpaper)")
     args = parser.parse_args(test_args)
+
+    # Handle --templates flag without list (print available templates)
+    if args.templates == "__list__":
+        print("Available templates in config:")
+        templates = config.get("templates", {})
+        if templates:
+            for template_file, output_path in templates.items():
+                print(f"  - {template_file.replace('.txt', '').upper()}: {template_file} -> {output_path}")
+        else:
+            print("  (no templates configured)")
+        print(f"\nConfig file location: {config_path}")
+        sys.exit(0)
+
+    # Handle --wsl flag
+    if args.wsl is not None:
+        if args.wsl == "__config__":
+            # Use config WSL value
+            if not config.get("wsl", "").strip():
+                fatal("WSL distro not specified and no WSL configured in config file.\n"
+                      "Either provide a distro name with -w/--wsl or configure it in: " + config_path)
+        # else: args.wsl contains the distro name
 
     # If only --headless flag was provided, process normally (will generate from current wallpaper)
     # Otherwise continue with normal CLI behavior
@@ -212,7 +249,35 @@ def main(test_args=None, test_config=None):
 
     # generate colors and apply config
     try:
-        gen_colors(current_wal, apply_config=not args.colors_only, light_mode=light_mode)
+        # Determine which templates to apply
+        templates_to_apply = None
+        if args.templates and args.templates != "__list__":
+            # Parse comma-separated template list
+            templates_to_apply = set(t.strip() for t in args.templates.split(","))
+            # Validate templates exist in config
+            for template in templates_to_apply:
+                if template not in config.get("templates", {}):
+                    print(f"Warning: template '{template}' not found in config, skipping")
+            templates_to_apply = templates_to_apply & set(config.get("templates", {}).keys())
+
+        # Determine WSL setting
+        wsl_setting = None
+        if args.wsl is not None:
+            if args.wsl == "__config__":
+                wsl_setting = config.get("wsl", "")
+            else:
+                wsl_setting = args.wsl
+
+        # Determine if we should apply config
+        apply_config = not args.colors_only or args.templates or args.wsl
+
+        gen_colors(
+            current_wal,
+            apply_config=apply_config,
+            light_mode=light_mode,
+            templates=templates_to_apply,
+            wsl=wsl_setting
+        )
     except Exception as e:
         fatal("Error generating colors from wallpaper: " + str(e) + "\n"
               "The wallpaper file may be corrupted or in an unsupported format.")

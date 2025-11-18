@@ -4,7 +4,7 @@ from json import loads, dumps
 from os import path, remove
 import base64
 import io
-from main import gen_colors, get_wallpaper, home
+from main import gen_colors, get_wallpaper, home, config_path
 
 
 class PrismaAPI:
@@ -20,9 +20,68 @@ class PrismaAPI:
         self.contrast = 50
         self.original_image = None
         self.adjusted_image_path = None
+        self.config = {}
+        self.active_templates = set()  # Track which templates are active
+        self.wsl_enabled = False  # Track if WSL is enabled
+
+        # Load config
+        self.load_config()
 
         # Load initial colors
         self.load_pywal_colors()
+
+    def load_config(self):
+        """Load config from file"""
+        try:
+            if path.isfile(config_path):
+                with open(config_path, "r") as f:
+                    self.config = loads(f.read())
+                    # Initialize all templates as active by default
+                    self.active_templates = set(self.config.get("templates", {}).keys())
+                    # Initialize WSL as enabled if defined
+                    self.wsl_enabled = bool(self.config.get("wsl", "").strip())
+                print(f"Loaded config with {len(self.active_templates)} templates")
+            else:
+                print(f"Config file not found at {config_path}")
+        except Exception as e:
+            print(f"Error loading config: {e}")
+            self.config = {}
+
+    def get_config_info(self):
+        """Get config information for UI"""
+        templates = {}
+        for template_file in self.config.get("templates", {}).keys():
+            # Convert filename to display name (e.g., "discord.txt" -> "DISCORD")
+            name = template_file.replace(".txt", "").upper()
+            templates[template_file] = {
+                "name": name,
+                "active": template_file in self.active_templates
+            }
+
+        wsl_info = None
+        if self.config.get("wsl", "").strip():
+            wsl_info = {
+                "name": self.config["wsl"],
+                "active": self.wsl_enabled
+            }
+
+        return {
+            "templates": templates,
+            "wsl": wsl_info
+        }
+
+    def toggle_template(self, template_file):
+        """Toggle a template on/off"""
+        if template_file in self.active_templates:
+            self.active_templates.remove(template_file)
+        else:
+            self.active_templates.add(template_file)
+        return template_file in self.active_templates
+
+    def toggle_wsl(self):
+        """Toggle WSL on/off"""
+        self.wsl_enabled = not self.wsl_enabled
+        return self.wsl_enabled
 
     def load_pywal_colors(self):
         """Load colors from pywal cache if it exists"""
@@ -214,8 +273,16 @@ class PrismaAPI:
             adjusted_image_path = self.adjust_and_save_image(self.current_image_path)
             self.adjusted_image_path = adjusted_image_path if is_adjusted else None
 
-            # Generate colors
-            gen_colors(adjusted_image_path, apply_config=False, light_mode=self.light_mode)
+            # Generate colors with selected templates and WSL
+            apply_config = len(self.active_templates) > 0 or self.wsl_enabled
+            wsl_setting = self.config.get("wsl") if self.wsl_enabled else False
+            gen_colors(
+                adjusted_image_path,
+                apply_config=apply_config,
+                light_mode=self.light_mode,
+                templates=self.active_templates if apply_config else None,
+                wsl=wsl_setting if apply_config else False
+            )
 
             # Reload colors
             self.load_pywal_colors()
@@ -407,6 +474,46 @@ HTML = """
             border: none;
         }
 
+        /* Template Selection Panel */
+        .template-panel {
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            padding: 10px 0;
+        }
+
+        .template-buttons {
+            display: inline-flex;
+            gap: 10px;
+        }
+
+        .btn-template {
+            padding: 10px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #1a1a1a;
+            color: #808080;
+            border: 1px solid #808080;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .btn-template.active {
+            background: #333333;
+            color: #ffffff;
+            border-color: #5588dd;
+        }
+
+        .btn-template:hover {
+            opacity: 0.8;
+        }
+
+        .btn-template:active {
+            opacity: 0.6;
+        }
+
         /* Controls */
         .controls {
             display: flex;
@@ -418,6 +525,24 @@ HTML = """
             display: flex;
             gap: 15px;
             justify-content: center;
+        }
+
+        .btn-icon {
+            padding: 12px 16px;
+            font-size: 16px;
+            background: #1a1a1a;
+            color: #808080;
+            border: 1px solid #808080;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-icon:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
         }
 
         button {
@@ -528,10 +653,18 @@ HTML = """
                 </div>
             </div>
 
+            <!-- Template Selection -->
+            <div class="panel template-panel">
+                <div class="template-buttons" id="templateButtons">
+                    <!-- Template buttons will be dynamically added here -->
+                </div>
+            </div>
+
             <!-- Controls -->
             <div class="panel">
                 <div class="controls">
                     <div class="button-group">
+                        <button class="btn-icon" onclick="openSettings()" title="Settings">⚙️</button>
                         <button class="btn-toggle" id="lightModeButton" onclick="toggleLightMode()">LIGHT MODE</button>
                         <button class="btn-primary" onclick="generateColors()">GENERATE COLORS</button>
                     </div>
@@ -560,6 +693,7 @@ HTML = """
             await loadColors();
             await loadWallpaper();
             await updateImageButton();
+            await loadTemplateButtons();
         });
 
         // Load colors from backend
@@ -737,6 +871,63 @@ HTML = """
             }
         }
 
+        // Load template buttons
+        async function loadTemplateButtons() {
+            try {
+                const configInfo = await pywebview.api.get_config_info();
+                const templateButtons = document.getElementById('templateButtons');
+                templateButtons.innerHTML = '';
+
+                // Add template buttons
+                for (const [templateFile, templateInfo] of Object.entries(configInfo.templates)) {
+                    const button = document.createElement('button');
+                    button.className = 'btn-template' + (templateInfo.active ? ' active' : '');
+                    button.textContent = templateInfo.name;
+                    button.onclick = () => toggleTemplate(templateFile, button);
+                    templateButtons.appendChild(button);
+                }
+
+                // Add WSL button if configured
+                if (configInfo.wsl) {
+                    const button = document.createElement('button');
+                    button.className = 'btn-template' + (configInfo.wsl.active ? ' active' : '');
+                    button.textContent = 'WSL (' + configInfo.wsl.name.toUpperCase() + ')';
+                    button.onclick = () => toggleWSL(button);
+                    templateButtons.appendChild(button);
+                }
+            } catch (e) {
+                console.error('Error loading template buttons:', e);
+            }
+        }
+
+        // Toggle template
+        async function toggleTemplate(templateFile, button) {
+            try {
+                const isActive = await pywebview.api.toggle_template(templateFile);
+                if (isActive) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            } catch (e) {
+                console.error('Error toggling template:', e);
+            }
+        }
+
+        // Toggle WSL
+        async function toggleWSL(button) {
+            try {
+                const isActive = await pywebview.api.toggle_wsl();
+                if (isActive) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            } catch (e) {
+                console.error('Error toggling WSL:', e);
+            }
+        }
+
         // Toggle light mode
         function toggleLightMode() {
             isLightMode = !isLightMode;
@@ -747,6 +938,12 @@ HTML = """
             } else {
                 lightModeButton.classList.remove('active');
             }
+        }
+
+        // Open settings (placeholder)
+        function openSettings() {
+            // For now, just show a message with config path
+            showMessage('Config location: ' + (navigator.platform.includes('Win') ? 'C:/Users/[USER]/AppData/Local/prisma/config.json' : '~/AppData/Local/prisma/config.json'), 'success');
         }
 
         // Saturation slider
