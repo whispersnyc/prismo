@@ -1,5 +1,5 @@
 import wx
-from PIL import Image
+from PIL import Image, ImageEnhance
 from json import loads
 from os import path
 import sys
@@ -58,6 +58,8 @@ class PrismaFrame(wx.Frame):
         self.light_mode = False
         self.colors = {}
         self.color_panels = {}
+        self.saturation = 50  # 0-100, 50 is normal
+        self.contrast = 50    # 0-100, 50 is normal
 
         # Load existing pywal colors if available
         self.load_pywal_colors()
@@ -124,6 +126,49 @@ class PrismaFrame(wx.Frame):
         self.loading_text.SetForegroundColour(fg_color)
         self.loading_text.SetBackgroundColour(bg_color)
         main_sizer.Add(self.loading_text, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
+        # Image adjustment sliders section
+        adjustment_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Saturation slider
+        saturation_box = wx.BoxSizer(wx.HORIZONTAL)
+        saturation_label = wx.StaticText(self.panel, label="Saturation:")
+        saturation_label.SetForegroundColour(fg_color)
+        saturation_label.SetBackgroundColour(bg_color)
+        saturation_box.Add(saturation_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+
+        self.saturation_slider = wx.Slider(self.panel, value=50, minValue=0, maxValue=100,
+                                          style=wx.SL_HORIZONTAL | wx.SL_LABELS, size=(300, -1))
+        self.saturation_slider.Bind(wx.EVT_SLIDER, self.on_saturation_change)
+        saturation_box.Add(self.saturation_slider, 1, wx.EXPAND | wx.RIGHT, 10)
+
+        self.saturation_value = wx.StaticText(self.panel, label="50")
+        self.saturation_value.SetForegroundColour(fg_color)
+        self.saturation_value.SetBackgroundColour(bg_color)
+        saturation_box.Add(self.saturation_value, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        adjustment_sizer.Add(saturation_box, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Contrast slider
+        contrast_box = wx.BoxSizer(wx.HORIZONTAL)
+        contrast_label = wx.StaticText(self.panel, label="Contrast:")
+        contrast_label.SetForegroundColour(fg_color)
+        contrast_label.SetBackgroundColour(bg_color)
+        contrast_box.Add(contrast_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+
+        self.contrast_slider = wx.Slider(self.panel, value=50, minValue=0, maxValue=100,
+                                        style=wx.SL_HORIZONTAL | wx.SL_LABELS, size=(300, -1))
+        self.contrast_slider.Bind(wx.EVT_SLIDER, self.on_contrast_change)
+        contrast_box.Add(self.contrast_slider, 1, wx.EXPAND | wx.RIGHT, 10)
+
+        self.contrast_value = wx.StaticText(self.panel, label="50")
+        self.contrast_value.SetForegroundColour(fg_color)
+        self.contrast_value.SetBackgroundColour(bg_color)
+        contrast_box.Add(self.contrast_value, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        adjustment_sizer.Add(contrast_box, 0, wx.EXPAND | wx.ALL, 5)
+
+        main_sizer.Add(adjustment_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
 
         # Color grid section
         color_label = wx.StaticText(self.panel, label="Color Palette")
@@ -260,6 +305,63 @@ class PrismaFrame(wx.Frame):
         """Toggle between light and dark mode"""
         self.light_mode = self.light_mode_checkbox.GetValue()
 
+    def on_saturation_change(self, event):
+        """Handle saturation slider change"""
+        self.saturation = self.saturation_slider.GetValue()
+        self.saturation_value.SetLabel(str(self.saturation))
+
+    def on_contrast_change(self, event):
+        """Handle contrast slider change"""
+        self.contrast = self.contrast_slider.GetValue()
+        self.contrast_value.SetLabel(str(self.contrast))
+
+    def adjust_and_save_image(self, image_path):
+        """Adjust image saturation and contrast, save with special naming convention
+
+        Args:
+            image_path: Path to the original image
+
+        Returns:
+            Path to the adjusted image
+        """
+        try:
+            # Open the image
+            img = Image.open(image_path)
+
+            # Convert saturation and contrast from 0-100 scale to PIL scale
+            # 50 = 1.0 (normal), 0 = 0.0, 100 = 2.0
+            saturation_factor = self.saturation / 50.0
+            contrast_factor = self.contrast / 50.0
+
+            # Apply saturation adjustment
+            if saturation_factor != 1.0:
+                enhancer = ImageEnhance.Color(img)
+                img = enhancer.enhance(saturation_factor)
+
+            # Apply contrast adjustment
+            if contrast_factor != 1.0:
+                enhancer = ImageEnhance.Contrast(img)
+                img = enhancer.enhance(contrast_factor)
+
+            # Create output filename with saturation and contrast values
+            base_dir = path.dirname(image_path)
+            base_name = path.basename(image_path)
+            name_without_ext, ext = path.splitext(base_name)
+
+            # Create new filename: original_name-s50c50.ext
+            adjusted_filename = f"{name_without_ext}-s{self.saturation}c{self.contrast}{ext}"
+            adjusted_path = path.join(base_dir, adjusted_filename)
+
+            # Save the adjusted image
+            img.save(adjusted_path)
+
+            return adjusted_path
+
+        except Exception as e:
+            print(f"Error adjusting image: {e}")
+            # Return original path if adjustment fails
+            return image_path
+
     def on_generate(self, event):
         """Generate colors from current image"""
         if not self.current_image_path:
@@ -273,8 +375,11 @@ class PrismaFrame(wx.Frame):
             return
 
         try:
-            # Generate colors using main.py function
-            gen_colors(self.current_image_path, apply_config=False, light_mode=self.light_mode)
+            # Adjust and save image with saturation and contrast
+            adjusted_image_path = self.adjust_and_save_image(self.current_image_path)
+
+            # Generate colors using main.py function with adjusted image
+            gen_colors(adjusted_image_path, apply_config=False, light_mode=self.light_mode)
 
             # Reload colors
             self.load_pywal_colors()
