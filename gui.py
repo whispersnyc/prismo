@@ -89,8 +89,8 @@ class PrismaAPI:
         import sys
         try:
             if sys.platform == 'win32':
-                # Windows: use default editor
-                subprocess.run(['start', '', config_path], shell=True)
+                # Windows: use explorer.exe to open with default app or show "Open With" dialog
+                subprocess.run(['explorer.exe', config_path])
             elif sys.platform == 'darwin':
                 # macOS: use open command
                 subprocess.run(['open', config_path])
