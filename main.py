@@ -9,11 +9,11 @@ import pywal.backends.wal
 from shutil import copytree
 import winreg
 
-home = path.expanduser("~").replace("\\", "/")
-data_path = home+"/AppData/Local/prisma"
-config_path = data_path+"/config.json"
-template_path = data_path+"/templates"
-licenses_path = data_path+"/licenses"
+home = path.expanduser("~")
+data_path = home + "\\AppData\\Local\\prisma"
+config_path = data_path + "\\config.json"
+template_path = data_path + "\\templates"
+licenses_path = data_path + "\\licenses"
 config = {}
 
 # get current Windows wallpaper path
@@ -23,8 +23,8 @@ def get_wallpaper():
         value, reg_type = winreg.QueryValueEx(key, "WallPaper")
         return value
 
-# convert path to Linux format for WSL
-convert = lambda i: "/mnt/"+i[0].lower()+i[2:].replace("\\", "/")
+# convert path to Linux format for WSL (handles both forward and backslashes)
+convert = lambda i: "/mnt/" + i[0].lower() + i[2:].replace("\\", "/")
 
 
 def fatal(msg, parser=None):
@@ -41,7 +41,7 @@ def resource(relative_path):
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = path.abspath(".")
-    return "/".join([base_path, "resources", relative_path])
+    return "\\".join([base_path, "resources", relative_path])
 
 
 class Parser(argparse.ArgumentParser):
@@ -69,7 +69,7 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
     print("Generated pywal colors" + (" (light mode)" if light_mode else ""))
 
     # write formatted JSON file
-    json_path = home+"/.cache/wal/colors.json"
+    json_path = home + "\\.cache\\wal\\colors.json"
     with open(json_path, "w") as cj:
         cj.write(dumps(wal, indent=4))
     print("Updated colors.json with formatted output: " + json_path)
@@ -110,7 +110,7 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         if not output:
             print("Skipped %s template (not found in config)" % base_name)
             continue
-        if not path.exists(template := (template_path+'/'+base_name)):
+        if not path.exists(template := (template_path + '\\' + base_name)):
             print("Skipped %s template (either template file or output folder is missing)" % base_name)
             continue
         with open(template, encoding='cp850') as base:
@@ -239,7 +239,7 @@ def main(test_args=None, test_config=None):
             print("Current wallpaper: " + current_wal)
         except Exception as e:
             # fallback to TranscodedWallpaper if binary fails
-            current_wal = home+"/AppData/Roaming/Microsoft/Windows/Themes/TranscodedWallpaper"
+            current_wal = home + "\\AppData\\Roaming\\Microsoft\\Windows\\Themes\\TranscodedWallpaper"
             print("Using fallback wallpaper path: " + current_wal)
 
             # check if fallback file exists

@@ -90,7 +90,7 @@ class PrismaAPI:
         try:
             if sys.platform == 'win32':
                 # Windows: use explorer.exe to open with default app or show "Open With" dialog
-                # Convert forward slashes to backslashes for Windows
+                # Ensure backslashes for Windows (support both slash types)
                 windows_path = config_path.replace('/', '\\')
                 subprocess.run(['explorer.exe', windows_path])
             elif sys.platform == 'darwin':
@@ -106,7 +106,7 @@ class PrismaAPI:
 
     def load_pywal_colors(self):
         """Load colors from pywal cache if it exists"""
-        colors_path = home + "/.cache/wal/colors.json"
+        colors_path = home + "\\.cache\\wal\\colors.json"
         print(f"Looking for pywal colors at: {colors_path}")
 
         if path.isfile(colors_path):
