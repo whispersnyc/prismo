@@ -23,7 +23,7 @@ from main import gen_colors, get_wallpaper, home
 
 KV = '''
 <BorderCard@MDCard>:
-    radius: 0
+    radius: [0, 0, 0, 0]
     canvas.before:
         Color:
             rgba: app.border_color
@@ -213,7 +213,7 @@ MDScreen:
                             on_release: app.select_image()
                             size_hint_x: None
                             width: dp(180)
-                            radius: 0
+                            radius: [0, 0, 0, 0]
 
                         MDRaisedButton:
                             text: "GENERATE COLORS"
@@ -221,7 +221,7 @@ MDScreen:
                             on_release: app.generate_colors()
                             size_hint_x: None
                             width: dp(180)
-                            radius: 0
+                            radius: [0, 0, 0, 0]
 
                         Widget:
 '''
@@ -237,7 +237,7 @@ class ColorBox(MDCard):
         self.height = 60
         self.md_bg_color = self.hex_to_rgb(color_value)
         self.elevation = 0
-        self.radius = 0
+        self.radius = [0, 0, 0, 0]
 
         # Add label
         label = MDLabel(
