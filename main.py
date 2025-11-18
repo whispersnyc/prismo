@@ -5,6 +5,7 @@ from json import loads, dumps
 from os import path, mkdir
 import sys
 import pywal
+import pywal.backends.wal
 from shutil import copytree
 
 home = path.expanduser("~").replace("\\", "/")
@@ -55,7 +56,7 @@ def gen_colors(img, apply_config=True):
     # get/create color scheme
     wal = pywal.colors.colors_to_dict(
             pywal.colors.saturate_colors(
-                getattr(sys.modules["pywal.backends.wal"], "get")(img, False),
+                pywal.backends.wal.get(img, False),
                 ""), img)
     print("Generated pywal colors")
 
