@@ -5,11 +5,5 @@
         "obsidian.txt": "HOME/Documents/Notes/.obsidian/themes/pywal.css"
     },
 
-    "wallpapers": "HOME/Pictures/Wallpapers",
-
-    "wal_engine": "",
-    "wal_engine_black": false,
-    "monitors": ["1920x1080"],
-    
     "wsl": ""
 }
