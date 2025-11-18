@@ -7,6 +7,7 @@ import sys
 import pywal
 import pywal.backends.wal
 from shutil import copytree
+import winreg
 
 home = path.expanduser("~").replace("\\", "/")
 data_path = home+"/AppData/Local/prisma"
@@ -16,8 +17,12 @@ licenses_path = data_path+"/licenses"
 config = {}
 
 # get current Windows wallpaper path
-get_wallpaper = lambda: check_output(["powershell.exe", "&",
-    '\"'+resource("wallpaper.exe")+'"'], stderr=DEVNULL).decode().strip()
+def get_wallpaper():
+    """Get current Windows wallpaper path from registry"""
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Desktop", 0, winreg.KEY_READ) as key:
+        value, reg_type = winreg.QueryValueEx(key, "WallPaper")
+        return value
+
 # convert path to Linux format for WSL
 convert = lambda i: "/mnt/"+i[0].lower()+i[2:].replace("\\", "/")
 
