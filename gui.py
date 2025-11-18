@@ -1,7 +1,7 @@
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.clock import Clock
-from kivy.properties import StringProperty, NumericProperty
+from kivy.properties import ListProperty
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.card import MDCard
@@ -22,231 +22,208 @@ from main import gen_colors, get_wallpaper, home
 
 
 KV = '''
+<BorderCard@MDCard>:
+    canvas.before:
+        Color:
+            rgba: app.border_color
+        Line:
+            rectangle: self.x, self.y, self.width, self.height
+            width: 1
+
 MDScreen:
     md_bg_color: app.bg_color
 
-    MDBoxLayout:
-        orientation: 'vertical'
-        padding: dp(20)
-        spacing: dp(15)
+    MDScrollView:
+        do_scroll_x: False
+        bar_width: 0
 
-        MDScrollView:
-            do_scroll_x: False
+        MDBoxLayout:
+            orientation: 'vertical'
+            spacing: dp(15)
+            adaptive_height: True
+            padding: dp(20)
 
-            MDBoxLayout:
+            # Image Preview Section
+            BorderCard:
                 orientation: 'vertical'
-                spacing: dp(15)
-                adaptive_height: True
+                size_hint_y: None
+                height: dp(225)
+                padding: dp(15)
+                elevation: 0
+                md_bg_color: app.bg_color
 
-                # Image Preview Card
                 MDCard:
-                    orientation: 'vertical'
                     size_hint_y: None
-                    height: dp(280)
-                    padding: dp(15)
-                    elevation: 2
-                    md_bg_color: app.card_bg_color
-
-                    MDLabel:
-                        text: "IMAGE PREVIEW"
-                        font_style: "H6"
-                        size_hint_y: None
-                        height: dp(30)
-                        theme_text_color: "Custom"
-                        text_color: app.accent_color
-                        halign: "center"
-
-                    MDCard:
-                        size_hint_y: None
-                        height: dp(210)
-                        md_bg_color: 0.04, 0.04, 0.04, 1
-
-                        MDBoxLayout:
-                            orientation: 'vertical'
-
-                            Image:
-                                id: image_preview
-                                size_hint: 1, 1
-                                allow_stretch: True
-                                keep_ratio: True
-
-                            MDLabel:
-                                id: loading_text
-                                text: "Loading..."
-                                halign: "center"
-                                theme_text_color: "Custom"
-                                text_color: 0.5, 0.5, 0.5, 1
-
-                # Image Adjustments Card
-                MDCard:
-                    orientation: 'vertical'
-                    size_hint_y: None
-                    height: dp(180)
-                    padding: dp(15)
-                    elevation: 2
-                    md_bg_color: app.card_bg_color
-
-                    MDLabel:
-                        text: "IMAGE ADJUSTMENTS"
-                        font_style: "H6"
-                        size_hint_y: None
-                        height: dp(30)
-                        theme_text_color: "Custom"
-                        text_color: app.accent_color
-                        halign: "center"
+                    height: dp(195)
+                    md_bg_color: 0.04, 0.04, 0.04, 1
+                    elevation: 0
 
                     MDBoxLayout:
                         orientation: 'vertical'
+
+                        Image:
+                            id: image_preview
+                            size_hint: 1, 1
+                            allow_stretch: True
+                            keep_ratio: True
+
+                        MDLabel:
+                            id: loading_text
+                            text: "Loading..."
+                            halign: "center"
+                            theme_text_color: "Custom"
+                            text_color: 0.5, 0.5, 0.5, 1
+
+            # Image Adjustments Section
+            BorderCard:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: dp(120)
+                padding: dp(15)
+                elevation: 0
+                md_bg_color: app.bg_color
+
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    spacing: dp(15)
+
+                    # Saturation Slider
+                    MDBoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: dp(40)
                         spacing: dp(10)
 
-                        # Saturation Slider
-                        MDBoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_y: None
-                            height: dp(40)
-                            spacing: dp(10)
+                        MDLabel:
+                            text: "Saturation"
+                            size_hint_x: None
+                            width: dp(100)
+                            theme_text_color: "Custom"
+                            text_color: app.fg_color
 
-                            MDLabel:
-                                text: "Saturation"
-                                size_hint_x: None
-                                width: dp(100)
-                                theme_text_color: "Custom"
-                                text_color: app.fg_color
+                        MDSlider:
+                            id: saturation_slider
+                            min: 0
+                            max: 100
+                            value: 50
+                            step: 1
+                            hint: True
+                            color: app.accent_color
+                            on_value: app.on_saturation_change(self.value)
 
-                            MDSlider:
-                                id: saturation_slider
-                                min: 0
-                                max: 100
-                                value: 50
-                                step: 1
-                                hint: True
-                                color: app.accent_color
-                                on_value: app.on_saturation_change(self.value)
+                        MDLabel:
+                            text: str(int(saturation_slider.value))
+                            size_hint_x: None
+                            width: dp(40)
+                            theme_text_color: "Custom"
+                            text_color: app.accent_color
+                            font_name: "RobotoMono-Regular"
 
-                            MDLabel:
-                                text: str(int(saturation_slider.value))
-                                size_hint_x: None
-                                width: dp(40)
-                                theme_text_color: "Custom"
-                                text_color: app.accent_color
-                                font_name: "RobotoMono-Regular"
-
-                        # Contrast Slider
-                        MDBoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_y: None
-                            height: dp(40)
-                            spacing: dp(10)
-
-                            MDLabel:
-                                text: "Contrast"
-                                size_hint_x: None
-                                width: dp(100)
-                                theme_text_color: "Custom"
-                                text_color: app.fg_color
-
-                            MDSlider:
-                                id: contrast_slider
-                                min: 0
-                                max: 100
-                                value: 50
-                                step: 1
-                                hint: True
-                                color: app.accent_color
-                                on_value: app.on_contrast_change(self.value)
-
-                            MDLabel:
-                                text: str(int(contrast_slider.value))
-                                size_hint_x: None
-                                width: dp(40)
-                                theme_text_color: "Custom"
-                                text_color: app.accent_color
-                                font_name: "RobotoMono-Regular"
-
-                # Color Palette Card
-                MDCard:
-                    orientation: 'vertical'
-                    size_hint_y: None
-                    height: dp(220)
-                    padding: dp(15)
-                    elevation: 2
-                    md_bg_color: app.card_bg_color
-
-                    MDLabel:
-                        text: "COLOR PALETTE"
-                        font_style: "H6"
+                    # Contrast Slider
+                    MDBoxLayout:
+                        orientation: 'horizontal'
                         size_hint_y: None
-                        height: dp(30)
-                        theme_text_color: "Custom"
-                        text_color: app.accent_color
-                        halign: "center"
+                        height: dp(40)
+                        spacing: dp(10)
 
-                    MDGridLayout:
-                        id: color_grid
-                        cols: 9
-                        rows: 2
-                        spacing: dp(6)
-                        size_hint_y: None
-                        height: dp(140)
+                        MDLabel:
+                            text: "Contrast"
+                            size_hint_x: None
+                            width: dp(100)
+                            theme_text_color: "Custom"
+                            text_color: app.fg_color
 
-                # Controls Card
-                MDCard:
+                        MDSlider:
+                            id: contrast_slider
+                            min: 0
+                            max: 100
+                            value: 50
+                            step: 1
+                            hint: True
+                            color: app.accent_color
+                            on_value: app.on_contrast_change(self.value)
+
+                        MDLabel:
+                            text: str(int(contrast_slider.value))
+                            size_hint_x: None
+                            width: dp(40)
+                            theme_text_color: "Custom"
+                            text_color: app.accent_color
+                            font_name: "RobotoMono-Regular"
+
+            # Color Palette Section
+            BorderCard:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: dp(170)
+                padding: dp(15)
+                elevation: 0
+                md_bg_color: app.bg_color
+
+                MDGridLayout:
+                    id: color_grid
+                    cols: 9
+                    rows: 2
+                    spacing: dp(6)
+
+            # Controls Section
+            BorderCard:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: dp(130)
+                padding: dp(15)
+                elevation: 0
+                md_bg_color: app.bg_color
+
+                MDBoxLayout:
                     orientation: 'vertical'
-                    size_hint_y: None
-                    height: dp(150)
-                    padding: dp(15)
-                    elevation: 2
-                    md_bg_color: app.card_bg_color
+                    spacing: dp(15)
 
                     MDBoxLayout:
-                        orientation: 'vertical'
-                        spacing: dp(15)
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: dp(40)
 
-                        MDBoxLayout:
-                            orientation: 'horizontal'
+                        Widget:
+
+                        MDCheckbox:
+                            id: light_mode_checkbox
+                            size_hint: None, None
+                            size: dp(40), dp(40)
+                            on_active: app.on_light_mode_toggle(self.active)
+
+                        MDLabel:
+                            text: "Light Mode Color Scheme"
+                            theme_text_color: "Custom"
+                            text_color: app.fg_color
                             size_hint_y: None
                             height: dp(40)
 
-                            Widget:
+                        Widget:
 
-                            MDCheckbox:
-                                id: light_mode_checkbox
-                                size_hint: None, None
-                                size: dp(40), dp(40)
-                                on_active: app.on_light_mode_toggle(self.active)
+                    MDBoxLayout:
+                        orientation: 'horizontal'
+                        spacing: dp(15)
+                        size_hint_y: None
+                        height: dp(50)
 
-                            MDLabel:
-                                text: "Light Mode Color Scheme"
-                                theme_text_color: "Custom"
-                                text_color: app.fg_color
-                                size_hint_y: None
-                                height: dp(40)
+                        Widget:
 
-                            Widget:
+                        MDRaisedButton:
+                            text: "SELECT IMAGE"
+                            md_bg_color: 0.2, 0.2, 0.2, 1
+                            on_release: app.select_image()
+                            size_hint_x: None
+                            width: dp(180)
 
-                        MDBoxLayout:
-                            orientation: 'horizontal'
-                            spacing: dp(15)
-                            size_hint_y: None
-                            height: dp(50)
+                        MDRaisedButton:
+                            text: "GENERATE COLORS"
+                            md_bg_color: app.accent_color
+                            on_release: app.generate_colors()
+                            size_hint_x: None
+                            width: dp(180)
 
-                            Widget:
-
-                            MDRaisedButton:
-                                text: "SELECT IMAGE"
-                                md_bg_color: 0.2, 0.2, 0.2, 1
-                                on_release: app.select_image()
-                                size_hint_x: None
-                                width: dp(180)
-
-                            MDRaisedButton:
-                                text: "GENERATE COLORS"
-                                md_bg_color: app.accent_color
-                                on_release: app.generate_colors()
-                                size_hint_x: None
-                                width: dp(180)
-
-                            Widget:
+                        Widget:
 '''
 
 
@@ -256,10 +233,10 @@ class ColorBox(MDCard):
         super().__init__(**kwargs)
         self.color_name = color_name
         self.color_value = color_value
-        self.size_hint = (None, None)
-        self.size = (80, 60)
+        self.size_hint = (1, None)
+        self.height = 60
         self.md_bg_color = self.hex_to_rgb(color_value)
-        self.elevation = 1
+        self.elevation = 0
 
         # Add label
         label = MDLabel(
@@ -300,10 +277,10 @@ class ColorBox(MDCard):
 
 class PrismaApp(MDApp):
     # Color properties
-    bg_color = [0.1, 0.1, 0.1, 1]
-    card_bg_color = [0.15, 0.15, 0.15, 1]
-    fg_color = [0.88, 0.88, 0.88, 1]
-    accent_color = [0.33, 0.53, 0.87, 1]
+    bg_color = ListProperty([0, 0, 0, 1])
+    border_color = ListProperty([0.5, 0.5, 0.5, 1])
+    fg_color = ListProperty([0.88, 0.88, 0.88, 1])
+    accent_color = ListProperty([0.33, 0.53, 0.87, 1])
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -327,6 +304,7 @@ class PrismaApp(MDApp):
 
         # Load colors
         self.load_pywal_colors()
+        self.update_theme_colors()
 
     def build(self):
         Window.size = (900, 800)
@@ -334,6 +312,19 @@ class PrismaApp(MDApp):
         Clock.schedule_once(self.load_current_wallpaper, 0.5)
         Clock.schedule_once(self.create_color_palette, 0.5)
         return self.screen
+
+    def hex_to_kivy_color(self, hex_color):
+        """Convert hex color to Kivy RGBA tuple"""
+        hex_color = hex_color.lstrip('#')
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        return [r/255, g/255, b/255, 1]
+
+    def update_theme_colors(self):
+        """Update app colors from pywal palette"""
+        self.bg_color = self.hex_to_kivy_color(self.colors.get("background", "#000000"))
+        self.border_color = self.hex_to_kivy_color(self.colors.get("foreground", "#808080"))
+        self.fg_color = self.hex_to_kivy_color(self.colors.get("foreground", "#808080"))
+        self.accent_color = self.hex_to_kivy_color(self.colors.get("color4", "#5588dd"))
 
     def load_pywal_colors(self):
         """Load colors from pywal cache if it exists"""
@@ -560,6 +551,9 @@ class PrismaApp(MDApp):
 
             # Reload colors
             self.load_pywal_colors()
+
+            # Update theme colors
+            self.update_theme_colors()
 
             # Update UI
             self.update_color_palette()
