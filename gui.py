@@ -90,7 +90,9 @@ class PrismaAPI:
         try:
             if sys.platform == 'win32':
                 # Windows: use explorer.exe to open with default app or show "Open With" dialog
-                subprocess.run(['explorer.exe', config_path])
+                # Convert forward slashes to backslashes for Windows
+                windows_path = config_path.replace('/', '\\')
+                subprocess.run(['explorer.exe', windows_path])
             elif sys.platform == 'darwin':
                 # macOS: use open command
                 subprocess.run(['open', config_path])
