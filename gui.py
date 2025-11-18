@@ -25,18 +25,24 @@ class PrismaAPI:
     def load_pywal_colors(self):
         """Load colors from pywal cache if it exists"""
         colors_path = home + "/.cache/wal/colors.json"
+        print(f"Looking for pywal colors at: {colors_path}")
+
         if path.isfile(colors_path):
             try:
                 with open(colors_path, "r") as f:
                     data = loads(f.read())
                     self.colors = data.get("colors", {})
                     self.colors.update(data.get("special", {}))
+                    print(f"Successfully loaded {len(self.colors)} colors from pywal cache")
             except Exception as e:
-                print(f"Could not load colors: {e}")
+                print(f"Could not load colors from {colors_path}: {e}")
                 self.colors = {}
+        else:
+            print(f"Pywal colors file not found at: {colors_path}")
 
         # Use gray defaults if no colors loaded
         if not self.colors:
+            print("Using default gray colors")
             self.colors = {
                 "background": "#000000",
                 "foreground": "#808080",
@@ -53,21 +59,35 @@ class PrismaAPI:
         """Load and return current Windows wallpaper as base64"""
         try:
             wallpaper_path = get_wallpaper()
-            if wallpaper_path and path.isfile(wallpaper_path):
-                self.current_image_path = wallpaper_path
-                return self.get_image_base64(wallpaper_path)
-            return None
+            print(f"Registry wallpaper path: {wallpaper_path}")
+
+            if wallpaper_path:
+                if path.isfile(wallpaper_path):
+                    print(f"Wallpaper file found, loading: {wallpaper_path}")
+                    self.current_image_path = wallpaper_path
+                    return self.get_image_base64(wallpaper_path)
+                else:
+                    print(f"Wallpaper file not found at: {wallpaper_path}")
+                    return None
+            else:
+                print("No wallpaper path returned from registry")
+                return None
         except Exception as e:
-            print(f"Error loading wallpaper: {e}")
+            print(f"Error loading wallpaper: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def get_image_base64(self, image_path, max_width=850, max_height=300):
         """Convert image to base64 for display"""
         try:
+            print(f"Converting image to base64: {image_path}")
             img = PILImage.open(image_path)
+            print(f"Image opened successfully, size: {img.size}")
 
             # Calculate aspect ratio and resize
             img.thumbnail((max_width, max_height), PILImage.Resampling.LANCZOS)
+            print(f"Image resized to: {img.size}")
 
             # Store original for adjustments
             self.original_image = PILImage.open(image_path)
@@ -80,9 +100,12 @@ class PrismaAPI:
             img.save(buffer, format='PNG')
             img_str = base64.b64encode(buffer.getvalue()).decode()
 
+            print(f"Image converted to base64 successfully ({len(img_str)} chars)")
             return f"data:image/png;base64,{img_str}"
         except Exception as e:
-            print(f"Error converting image: {e}")
+            print(f"Error converting image to base64: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def apply_adjustments(self, img):
@@ -457,7 +480,9 @@ HTML = """
         // Load colors from backend
         async function loadColors() {
             try {
+                console.log('Loading colors from backend...');
                 const colors = await pywebview.api.get_colors();
+                console.log('Colors loaded:', colors);
                 updateColorGrid(colors);
                 updateTheme(colors);
             } catch (e) {
@@ -468,15 +493,18 @@ HTML = """
         // Load current wallpaper
         async function loadWallpaper() {
             try {
+                console.log('Loading wallpaper from backend...');
                 const imageData = await pywebview.api.load_current_wallpaper();
+                console.log('Wallpaper loaded, data length:', imageData ? imageData.length : 'null');
                 if (imageData) {
                     imagePreview.innerHTML = '<img src="' + imageData + '">';
                 } else {
+                    console.log('No wallpaper data returned');
                     imagePreview.innerHTML = '<div class="placeholder">No wallpaper found</div>';
                 }
             } catch (e) {
                 console.error('Error loading wallpaper:', e);
-                imagePreview.innerHTML = '<div class="placeholder">Error loading wallpaper</div>';
+                imagePreview.innerHTML = '<div class="placeholder">Error loading wallpaper: ' + e.message + '</div>';
             }
         }
 
