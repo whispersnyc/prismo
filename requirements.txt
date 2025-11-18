@@ -13,3 +13,4 @@ pywin32-ctypes
 requests
 urllib3
 pytest
+wxPython

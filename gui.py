@@ -1,34 +1,82 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+import wx
+from PIL import Image
 from json import loads
 from os import path
 import sys
 from main import gen_colors, get_wallpaper, home
 
-class PrismaGUI:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Prisma - Pywal Color Generator")
-        self.root.geometry("800x700")
+
+class ColorPanel(wx.Panel):
+    """Custom panel to display a color with label"""
+    def __init__(self, parent, color_name, color_value):
+        super().__init__(parent, size=(80, 60))
+        self.color_name = color_name
+        self.color_value = color_value
+
+        # Set background color
+        self.SetBackgroundColour(color_value)
+
+        # Create label
+        contrast_color = self.get_contrast_color(color_value)
+        self.label = wx.StaticText(self, label=color_name, style=wx.ALIGN_CENTER)
+        self.label.SetForegroundColour(contrast_color)
+        self.label.SetFont(wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+
+        # Center the label
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.label, 1, wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
+        self.SetSizer(sizer)
+
+    def update_color(self, color_value):
+        """Update the panel color"""
+        self.color_value = color_value
+        self.SetBackgroundColour(color_value)
+        contrast_color = self.get_contrast_color(color_value)
+        self.label.SetForegroundColour(contrast_color)
+        self.Refresh()
+
+    def get_contrast_color(self, hex_color):
+        """Get contrasting text color (black or white) for a given background color"""
+        try:
+            # Remove # if present
+            hex_color = hex_color.lstrip('#')
+            # Convert to RGB
+            r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+            # Calculate luminance
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            return "#000000" if luminance > 0.5 else "#ffffff"
+        except:
+            return "#ffffff"
+
+
+class PrismaFrame(wx.Frame):
+    def __init__(self):
+        super().__init__(None, title="Prisma - Pywal Color Generator", size=(820, 750))
 
         # State variables
         self.current_image_path = None
         self.light_mode = False
         self.colors = {}
+        self.color_panels = {}
 
         # Load existing pywal colors if available
         self.load_pywal_colors()
 
         # Set background color
         bg_color = self.colors.get("background", "#000000")
-        self.root.configure(bg=bg_color)
+        self.SetBackgroundColour(bg_color)
 
-        # Create GUI elements
+        # Create panel and UI
+        self.panel = wx.Panel(self)
+        self.panel.SetBackgroundColour(bg_color)
+
+        # Create UI
         self.create_widgets()
 
         # Load current wallpaper
         self.load_current_wallpaper()
+
+        self.Centre()
 
     def load_pywal_colors(self):
         """Load colors from pywal cache if it exists"""
@@ -56,35 +104,38 @@ class PrismaGUI:
         bg_color = self.colors.get("background", "#000000")
         fg_color = self.colors.get("foreground", "#ffffff")
 
+        # Main sizer
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+
         # Image preview section
-        preview_frame = tk.Frame(self.root, bg=bg_color)
-        preview_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+        preview_label = wx.StaticText(self.panel, label="Image Preview")
+        preview_label.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        preview_label.SetForegroundColour(fg_color)
+        preview_label.SetBackgroundColour(bg_color)
+        main_sizer.Add(preview_label, 0, wx.ALIGN_CENTER | wx.TOP, 10)
 
-        preview_label = tk.Label(preview_frame, text="Image Preview",
-                                bg=bg_color, fg=fg_color, font=("Arial", 12, "bold"))
-        preview_label.pack()
+        # Image display
+        self.image_bitmap = wx.StaticBitmap(self.panel)
+        self.image_bitmap.SetBackgroundColour(bg_color)
+        main_sizer.Add(self.image_bitmap, 0, wx.ALIGN_CENTER | wx.ALL, 10)
 
-        self.image_label = tk.Label(preview_frame, bg=bg_color,
-                                    text="Loading...", fg=fg_color)
-        self.image_label.pack(pady=5)
+        # Loading text (will be hidden when image loads)
+        self.loading_text = wx.StaticText(self.panel, label="Loading...")
+        self.loading_text.SetForegroundColour(fg_color)
+        self.loading_text.SetBackgroundColour(bg_color)
+        main_sizer.Add(self.loading_text, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
         # Color grid section
-        color_frame = tk.Frame(self.root, bg=bg_color)
-        color_frame.pack(pady=10, padx=10)
+        color_label = wx.StaticText(self.panel, label="Color Palette")
+        color_label.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        color_label.SetForegroundColour(fg_color)
+        color_label.SetBackgroundColour(bg_color)
+        main_sizer.Add(color_label, 0, wx.ALIGN_CENTER | wx.TOP, 10)
 
-        grid_label = tk.Label(color_frame, text="Color Palette",
-                             bg=bg_color, fg=fg_color, font=("Arial", 12, "bold"))
-        grid_label.pack()
+        # Create grid for colors (2 rows x 9 columns)
+        grid_sizer = wx.GridSizer(rows=2, cols=9, hgap=4, vgap=4)
 
-        # Create grid container
-        grid_container = tk.Frame(color_frame, bg=bg_color)
-        grid_container.pack(pady=5)
-
-        # Store color labels for updates
-        self.color_labels = {}
-
-        # Row 1: background/foreground, color0/1, color2/3, ..., color12/13
-        # Row 2: (empty), color14/15, and remaining pairs
+        # Color pairs for the grid
         color_pairs = [
             ("background", "foreground"),
             ("color0", "color1"),
@@ -93,105 +144,62 @@ class PrismaGUI:
             ("color6", "color7"),
             ("color8", "color9"),
             ("color10", "color11"),
-            ("color12", "color13")
+            ("color12", "color13"),
+            ("color14", "color15")
         ]
 
-        for col, (color1, color2) in enumerate(color_pairs):
+        # Create color panels
+        for color1, color2 in color_pairs:
             # First color (top row)
             color1_val = self.colors.get(color1, "#808080")
-            frame1 = tk.Frame(grid_container, bg=color1_val,
-                            width=80, height=60, relief=tk.RAISED, borderwidth=2)
-            frame1.grid(row=0, column=col, padx=2, pady=2)
-            frame1.pack_propagate(False)
+            panel1 = ColorPanel(self.panel, color1, color1_val)
+            grid_sizer.Add(panel1, 0, wx.ALL, 2)
+            self.color_panels[color1] = panel1
 
-            label1 = tk.Label(frame1, text=color1, bg=color1_val,
-                            fg=self.get_contrast_color(color1_val),
-                            font=("Arial", 8))
-            label1.pack(expand=True)
-            self.color_labels[color1] = (frame1, label1)
-
+        for color1, color2 in color_pairs:
             # Second color (bottom row)
             color2_val = self.colors.get(color2, "#808080")
-            frame2 = tk.Frame(grid_container, bg=color2_val,
-                            width=80, height=60, relief=tk.RAISED, borderwidth=2)
-            frame2.grid(row=1, column=col, padx=2, pady=2)
-            frame2.pack_propagate(False)
+            panel2 = ColorPanel(self.panel, color2, color2_val)
+            grid_sizer.Add(panel2, 0, wx.ALL, 2)
+            self.color_panels[color2] = panel2
 
-            label2 = tk.Label(frame2, text=color2, bg=color2_val,
-                            fg=self.get_contrast_color(color2_val),
-                            font=("Arial", 8))
-            label2.pack(expand=True)
-            self.color_labels[color2] = (frame2, label2)
-
-        # Add color14 and color15 in the last column
-        color14_val = self.colors.get("color14", "#808080")
-        frame14 = tk.Frame(grid_container, bg=color14_val,
-                          width=80, height=60, relief=tk.RAISED, borderwidth=2)
-        frame14.grid(row=0, column=8, padx=2, pady=2)
-        frame14.pack_propagate(False)
-
-        label14 = tk.Label(frame14, text="color14", bg=color14_val,
-                          fg=self.get_contrast_color(color14_val),
-                          font=("Arial", 8))
-        label14.pack(expand=True)
-        self.color_labels["color14"] = (frame14, label14)
-
-        color15_val = self.colors.get("color15", "#808080")
-        frame15 = tk.Frame(grid_container, bg=color15_val,
-                          width=80, height=60, relief=tk.RAISED, borderwidth=2)
-        frame15.grid(row=1, column=8, padx=2, pady=2)
-        frame15.pack_propagate(False)
-
-        label15 = tk.Label(frame15, text="color15", bg=color15_val,
-                          fg=self.get_contrast_color(color15_val),
-                          font=("Arial", 8))
-        label15.pack(expand=True)
-        self.color_labels["color15"] = (frame15, label15)
+        main_sizer.Add(grid_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
 
         # Controls section
-        controls_frame = tk.Frame(self.root, bg=bg_color)
-        controls_frame.pack(pady=10, padx=10)
+        controls_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        # Light mode toggle
-        self.light_mode_var = tk.BooleanVar(value=self.light_mode)
-        light_toggle = tk.Checkbutton(controls_frame, text="Light Mode",
-                                     variable=self.light_mode_var,
-                                     command=self.toggle_light_mode,
-                                     bg=bg_color, fg=fg_color,
-                                     selectcolor=bg_color,
-                                     font=("Arial", 10))
-        light_toggle.pack(pady=5)
+        # Light mode checkbox
+        self.light_mode_checkbox = wx.CheckBox(self.panel, label="Light Mode")
+        self.light_mode_checkbox.SetValue(self.light_mode)
+        self.light_mode_checkbox.SetForegroundColour(fg_color)
+        self.light_mode_checkbox.SetBackgroundColour(bg_color)
+        self.light_mode_checkbox.Bind(wx.EVT_CHECKBOX, self.on_toggle_light_mode)
+        controls_sizer.Add(self.light_mode_checkbox, 0, wx.ALL, 5)
+
+        main_sizer.Add(controls_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
 
         # Buttons section
-        button_frame = tk.Frame(self.root, bg=bg_color)
-        button_frame.pack(pady=10, padx=10)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        select_btn = tk.Button(button_frame, text="Select File",
-                              command=self.select_file,
-                              bg=self.colors.get("color4", "#4080ff"),
-                              fg=fg_color, font=("Arial", 11, "bold"),
-                              padx=20, pady=10, relief=tk.RAISED)
-        select_btn.pack(side=tk.LEFT, padx=10)
+        # Select File button
+        self.select_btn = wx.Button(self.panel, label="Select File", size=(150, 40))
+        self.select_btn.SetBackgroundColour(self.colors.get("color4", "#4080ff"))
+        self.select_btn.SetForegroundColour(fg_color)
+        self.select_btn.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        self.select_btn.Bind(wx.EVT_BUTTON, self.on_select_file)
+        button_sizer.Add(self.select_btn, 0, wx.ALL, 10)
 
-        generate_btn = tk.Button(button_frame, text="Generate",
-                                command=self.generate_colors,
-                                bg=self.colors.get("color2", "#40ff80"),
-                                fg=fg_color, font=("Arial", 11, "bold"),
-                                padx=20, pady=10, relief=tk.RAISED)
-        generate_btn.pack(side=tk.LEFT, padx=10)
+        # Generate button
+        self.generate_btn = wx.Button(self.panel, label="Generate", size=(150, 40))
+        self.generate_btn.SetBackgroundColour(self.colors.get("color2", "#40ff80"))
+        self.generate_btn.SetForegroundColour(fg_color)
+        self.generate_btn.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        self.generate_btn.Bind(wx.EVT_BUTTON, self.on_generate)
+        button_sizer.Add(self.generate_btn, 0, wx.ALL, 10)
 
-    def get_contrast_color(self, hex_color):
-        """Get contrasting text color (black or white) for a given background color"""
-        try:
-            # Remove # if present
-            hex_color = hex_color.lstrip('#')
-            # Convert to RGB
-            r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
-            # Calculate luminance
-            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-            return "#000000" if luminance > 0.5 else "#ffffff"
-        except:
-            return "#ffffff"
+        main_sizer.Add(button_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
+
+        self.panel.SetSizer(main_sizer)
 
     def load_current_wallpaper(self):
         """Load and display current Windows wallpaper"""
@@ -201,9 +209,9 @@ class PrismaGUI:
                 self.current_image_path = wallpaper_path
                 self.display_image(wallpaper_path)
             else:
-                self.image_label.config(text="No wallpaper found")
+                self.loading_text.SetLabel("No wallpaper found")
         except Exception as e:
-            self.image_label.config(text=f"Could not load wallpaper")
+            self.loading_text.SetLabel("Could not load wallpaper")
             print(f"Error loading wallpaper: {e}")
 
     def display_image(self, image_path):
@@ -216,43 +224,52 @@ class PrismaGUI:
             max_width, max_height = 400, 200
             img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
 
-            # Convert to PhotoImage
-            photo = ImageTk.PhotoImage(img)
+            # Convert PIL image to wx.Image
+            width, height = img.size
+            wx_image = wx.Image(width, height)
+            wx_image.SetData(img.convert("RGB").tobytes())
 
-            # Update label
-            self.image_label.config(image=photo, text="")
-            self.image_label.image = photo  # Keep a reference
+            # Convert to bitmap and display
+            bitmap = wx.Bitmap(wx_image)
+            self.image_bitmap.SetBitmap(bitmap)
+
+            # Hide loading text
+            self.loading_text.SetLabel("")
+
+            # Refresh layout
+            self.panel.Layout()
 
         except Exception as e:
-            self.image_label.config(text=f"Error loading image")
+            self.loading_text.SetLabel("Error loading image")
             print(f"Error displaying image: {e}")
 
-    def select_file(self):
+    def on_select_file(self, event):
         """Open file dialog to select an image"""
-        file_path = filedialog.askopenfilename(
-            title="Select an image",
-            filetypes=[
-                ("Image files", "*.png *.jpg *.jpeg *.bmp *.gif *.tiff"),
-                ("All files", "*.*")
-            ]
-        )
+        wildcard = "Image files (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tiff)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tiff|All files (*.*)|*.*"
 
-        if file_path:
-            self.current_image_path = file_path
-            self.display_image(file_path)
+        with wx.FileDialog(self, "Select an image",
+                          wildcard=wildcard,
+                          style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file_dialog:
 
-    def toggle_light_mode(self):
+            if file_dialog.ShowModal() == wx.ID_OK:
+                file_path = file_dialog.GetPath()
+                self.current_image_path = file_path
+                self.display_image(file_path)
+
+    def on_toggle_light_mode(self, event):
         """Toggle between light and dark mode"""
-        self.light_mode = self.light_mode_var.get()
+        self.light_mode = self.light_mode_checkbox.GetValue()
 
-    def generate_colors(self):
+    def on_generate(self, event):
         """Generate colors from current image"""
         if not self.current_image_path:
-            messagebox.showerror("Error", "No image selected. Please select an image first.")
+            wx.MessageBox("No image selected. Please select an image first.",
+                         "Error", wx.OK | wx.ICON_ERROR)
             return
 
         if not path.isfile(self.current_image_path):
-            messagebox.showerror("Error", "Selected image file does not exist.")
+            wx.MessageBox("Selected image file does not exist.",
+                         "Error", wx.OK | wx.ICON_ERROR)
             return
 
         try:
@@ -265,10 +282,12 @@ class PrismaGUI:
             # Update UI
             self.update_colors()
 
-            messagebox.showinfo("Success", "Colors generated successfully!")
+            wx.MessageBox("Colors generated successfully!",
+                         "Success", wx.OK | wx.ICON_INFORMATION)
 
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to generate colors: {str(e)}")
+            wx.MessageBox(f"Failed to generate colors: {str(e)}",
+                         "Error", wx.OK | wx.ICON_ERROR)
             print(f"Error generating colors: {e}")
 
     def update_colors(self):
@@ -276,31 +295,41 @@ class PrismaGUI:
         bg_color = self.colors.get("background", "#000000")
         fg_color = self.colors.get("foreground", "#ffffff")
 
-        # Update root background
-        self.root.configure(bg=bg_color)
+        # Update frame and panel background
+        self.SetBackgroundColour(bg_color)
+        self.panel.SetBackgroundColour(bg_color)
 
-        # Update all color labels
-        for color_name, (frame, label) in self.color_labels.items():
+        # Update all color panels
+        for color_name, panel in self.color_panels.items():
             color_val = self.colors.get(color_name, "#808080")
-            frame.config(bg=color_val)
-            label.config(bg=color_val, fg=self.get_contrast_color(color_val))
+            panel.update_color(color_val)
 
-        # Update all frames
-        for widget in self.root.winfo_children():
-            if isinstance(widget, tk.Frame):
-                widget.config(bg=bg_color)
-                for child in widget.winfo_children():
-                    if isinstance(child, tk.Frame):
-                        child.config(bg=bg_color)
-                    elif isinstance(child, tk.Label) and child != self.image_label:
-                        child.config(bg=bg_color, fg=fg_color)
-                    elif isinstance(child, tk.Checkbutton):
-                        child.config(bg=bg_color, fg=fg_color, selectcolor=bg_color)
+        # Update button colors
+        self.select_btn.SetBackgroundColour(self.colors.get("color4", "#4080ff"))
+        self.select_btn.SetForegroundColour(fg_color)
+        self.generate_btn.SetBackgroundColour(self.colors.get("color2", "#40ff80"))
+        self.generate_btn.SetForegroundColour(fg_color)
+
+        # Update checkbox and labels
+        self.light_mode_checkbox.SetForegroundColour(fg_color)
+        self.light_mode_checkbox.SetBackgroundColour(bg_color)
+
+        for child in self.panel.GetChildren():
+            if isinstance(child, wx.StaticText):
+                child.SetForegroundColour(fg_color)
+                child.SetBackgroundColour(bg_color)
+
+        # Refresh the display
+        self.panel.Refresh()
+        self.Refresh()
+
 
 def main():
-    root = tk.Tk()
-    app = PrismaGUI(root)
-    root.mainloop()
+    app = wx.App()
+    frame = PrismaFrame()
+    frame.Show()
+    app.MainLoop()
+
 
 if __name__ == "__main__":
     main()
