@@ -406,8 +406,8 @@ HTML = """
             width: 40px;
             height: 40px;
             background: rgba(51, 51, 51, 0.8);
-            border: 1px solid var(--fg-dark, #808080);
-            color: var(--fg-dark, #808080);
+            border: 1px solid #808080;
+            color: #808080;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -493,8 +493,8 @@ HTML = """
             font-size: 12px;
             font-weight: 600;
             background: #1a1a1a;
-            color: var(--fg-dark, #808080);
-            border: 1px solid var(--fg-dark, #808080);
+            color: #808080;
+            border: 1px solid #808080;
             cursor: pointer;
             transition: all 0.2s;
             letter-spacing: 0.5px;
@@ -504,7 +504,7 @@ HTML = """
         .btn-template.active {
             background: #333333;
             color: #ffffff;
-            border-color: var(--accent-color, #5588dd);
+            border-color: #5588dd;
         }
 
         .btn-template:hover {
@@ -532,8 +532,8 @@ HTML = """
             padding: 12px 16px;
             font-size: 16px;
             background: #1a1a1a;
-            color: var(--fg-dark, #808080);
-            border: 1px solid var(--fg-dark, #808080);
+            color: #808080;
+            border: 1px solid #808080;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
@@ -568,15 +568,15 @@ HTML = """
 
         .btn-toggle {
             background: #1a1a1a;
-            color: var(--fg-dark, #808080);
-            border-color: var(--fg-dark, #808080);
+            color: #808080;
+            border-color: #808080;
             position: relative;
         }
 
         .btn-toggle.active {
             background: #333333;
             color: #ffffff;
-            border-color: var(--accent-color, #5588dd);
+            border-color: #5588dd;
         }
 
         .btn-toggle::before {
@@ -792,14 +792,6 @@ HTML = """
 
             console.log('Extracted colors:', { bg, fg, accent });
 
-            // Calculate darkened foreground (70% brightness)
-            const fgDark = darkenColor(fg, 0.7);
-            console.log('Darkened foreground color:', fgDark);
-
-            // Set CSS variables
-            document.documentElement.style.setProperty('--fg-dark', fgDark);
-            document.documentElement.style.setProperty('--accent-color', accent);
-
             document.body.style.backgroundColor = bg;
             document.body.style.color = fg;
 
@@ -823,15 +815,15 @@ HTML = """
             // Update button primary color
             document.querySelector('.btn-primary').style.backgroundColor = accent;
 
-            // Update all UI buttons with darkened foreground
+            // Update all UI buttons with foreground color
             console.log('Calling updateButtonColors...');
-            updateButtonColors(fgDark, accent);
+            updateButtonColors(fg, accent);
         }
 
         // Update button colors directly
-        function updateButtonColors(fgDark, accent) {
+        function updateButtonColors(fg, accent) {
             console.log('=== updateButtonColors called ===');
-            console.log('fgDark:', fgDark, 'accent:', accent);
+            console.log('fg:', fg, 'accent:', accent);
 
             // Update template/integration buttons
             const templateBtns = document.querySelectorAll('.btn-template');
@@ -840,9 +832,9 @@ HTML = """
                 const isActive = btn.classList.contains('active');
                 console.log(`Template button ${index}: active=${isActive}`);
                 if (!isActive) {
-                    btn.style.color = fgDark;
-                    btn.style.borderColor = fgDark;
-                    console.log(`  Set color to ${fgDark}`);
+                    btn.style.color = fg;
+                    btn.style.borderColor = fg;
+                    console.log(`  Set color to ${fg}`);
                 } else {
                     btn.style.borderColor = accent;
                     console.log(`  Set border to ${accent} (active)`);
@@ -856,9 +848,9 @@ HTML = """
                 const isActive = btn.classList.contains('active');
                 console.log(`Toggle button ${index}: active=${isActive}`);
                 if (!isActive) {
-                    btn.style.color = fgDark;
-                    btn.style.borderColor = fgDark;
-                    console.log(`  Set color to ${fgDark}`);
+                    btn.style.color = fg;
+                    btn.style.borderColor = fg;
+                    console.log(`  Set color to ${fg}`);
                 } else {
                     btn.style.borderColor = accent;
                     console.log(`  Set border to ${accent} (active)`);
@@ -869,18 +861,18 @@ HTML = """
             const iconBtns = document.querySelectorAll('.btn-icon');
             console.log('Found', iconBtns.length, 'icon buttons');
             iconBtns.forEach((btn, index) => {
-                btn.style.color = fgDark;
-                btn.style.borderColor = fgDark;
-                console.log(`Icon button ${index}: Set color to ${fgDark}`);
+                btn.style.color = fg;
+                btn.style.borderColor = fg;
+                console.log(`Icon button ${index}: Set color to ${fg}`);
             });
 
             // Update image button
             const imageBtn = document.getElementById('imageButton');
             console.log('Image button found:', !!imageBtn);
             if (imageBtn) {
-                imageBtn.style.color = fgDark;
-                imageBtn.style.borderColor = fgDark;
-                console.log(`Image button: Set color to ${fgDark}`);
+                imageBtn.style.color = fg;
+                imageBtn.style.borderColor = fg;
+                console.log(`Image button: Set color to ${fg}`);
             }
         }
 
@@ -1006,8 +998,7 @@ HTML = """
                 console.log('Template buttons created, applying theme colors...');
                 const fg = currentColors.foreground || '#808080';
                 const accent = currentColors.color4 || '#5588dd';
-                const fgDark = darkenColor(fg, 0.7);
-                updateButtonColors(fgDark, accent);
+                updateButtonColors(fg, accent);
             } catch (e) {
                 console.error('Error loading template buttons:', e);
             }
@@ -1019,15 +1010,14 @@ HTML = """
                 const isActive = await pywebview.api.toggle_template(templateFile);
                 const accent = currentColors.color4 || '#5588dd';
                 const fg = currentColors.foreground || '#808080';
-                const fgDark = darkenColor(fg, 0.7);
 
                 if (isActive) {
                     button.classList.add('active');
                     button.style.borderColor = accent;
                 } else {
                     button.classList.remove('active');
-                    button.style.color = fgDark;
-                    button.style.borderColor = fgDark;
+                    button.style.color = fg;
+                    button.style.borderColor = fg;
                 }
             } catch (e) {
                 console.error('Error toggling template:', e);
@@ -1040,15 +1030,14 @@ HTML = """
                 const isActive = await pywebview.api.toggle_wsl();
                 const accent = currentColors.color4 || '#5588dd';
                 const fg = currentColors.foreground || '#808080';
-                const fgDark = darkenColor(fg, 0.7);
 
                 if (isActive) {
                     button.classList.add('active');
                     button.style.borderColor = accent;
                 } else {
                     button.classList.remove('active');
-                    button.style.color = fgDark;
-                    button.style.borderColor = fgDark;
+                    button.style.color = fg;
+                    button.style.borderColor = fg;
                 }
             } catch (e) {
                 console.error('Error toggling WSL:', e);
@@ -1062,15 +1051,14 @@ HTML = """
 
             const accent = currentColors.color4 || '#5588dd';
             const fg = currentColors.foreground || '#808080';
-            const fgDark = darkenColor(fg, 0.7);
 
             if (isLightMode) {
                 lightModeButton.classList.add('active');
                 lightModeButton.style.borderColor = accent;
             } else {
                 lightModeButton.classList.remove('active');
-                lightModeButton.style.color = fgDark;
-                lightModeButton.style.borderColor = fgDark;
+                lightModeButton.style.color = fg;
+                lightModeButton.style.borderColor = fg;
             }
         }
 
