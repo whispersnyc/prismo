@@ -1,0 +1,72 @@
+# Prisma Template - Alacritty Terminal
+# This template demonstrates the new .prisma format with line-specific updates
+# It updates an existing Alacritty config file with pywal colors
+
+@target HOME\AppData\Roaming\alacritty\alacritty.toml
+
+# Update primary colors section (lines 50-60 in typical config)
+# This assumes the config has a [colors.primary] section around these lines
+@match ".*\[colors\.primary\].*"
+[colors.primary]
+
+@match ".*background.*=.*"
+background = '{background}'
+
+@match ".*foreground.*=.*"
+foreground = '{foreground}'
+
+# Update normal colors (lines 65-80)
+@match ".*\[colors\.normal\].*"
+[colors.normal]
+
+@match ".*black.*=.*"
+black = '{color0}'
+
+@match ".*red.*=.*"
+red = '{color1}'
+
+@match ".*green.*=.*"
+green = '{color2}'
+
+@match ".*yellow.*=.*"
+yellow = '{color3}'
+
+@match ".*blue.*=.*"
+blue = '{color4}'
+
+@match ".*magenta.*=.*"
+magenta = '{color5}'
+
+@match ".*cyan.*=.*"
+cyan = '{color6}'
+
+@match ".*white.*=.*"
+white = '{color7}'
+
+# Update bright colors
+@match ".*\[colors\.bright\].*"
+[colors.bright]
+
+@match ".*black.*=.*"
+black = '{color8}'
+
+@match ".*red.*=.*"
+red = '{color9}'
+
+@match ".*green.*=.*"
+green = '{color10}'
+
+@match ".*yellow.*=.*"
+yellow = '{color11}'
+
+@match ".*blue.*=.*"
+blue = '{color12}'
+
+@match ".*magenta.*=.*"
+magenta = '{color13}'
+
+@match ".*cyan.*=.*"
+cyan = '{color14}'
+
+@match ".*white.*=.*"
+white = '{color15}'

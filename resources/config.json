@@ -1,0 +1,10 @@
+{
+    "templates":
+    {
+        "discord.txt": "HOME\\AppData\\Roaming\\BetterDiscord\\themes\\pywal-discord-default.theme.css",
+        "obsidian.txt": "HOME\\Documents\\Notes\\.obsidian\\themes\\pywal.css"
+    },
+
+    "wsl": "",
+    "light_mode": false
+}

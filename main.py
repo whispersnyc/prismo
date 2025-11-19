@@ -2,18 +2,18 @@ import argparse
 from colorsys import rgb_to_hls
 from subprocess import Popen, check_output, DEVNULL, CalledProcessError
 from json import loads, dumps
-from os import path, mkdir
+from os import path
 import sys
 import pywal
 import pywal.backends.wal
-from shutil import copytree
 import winreg
+from template_parser import apply_template
+from config_manager import (
+    load_config, home, data_path, config_path,
+    template_path, licenses_path
+)
 
-home = path.expanduser("~")
-data_path = home + "\\AppData\\Local\\prisma"
-config_path = data_path + "\\config.json"
-template_path = data_path + "\\templates"
-licenses_path = data_path + "\\licenses"
+# Global config - will be loaded in main()
 config = {}
 
 # get current Windows wallpaper path
@@ -35,22 +35,13 @@ def fatal(msg, parser=None):
     sys.exit(2)
 
 
-def resource(relative_path):
-    """Get absolute path to resource for dev/PyInstaller"""
-    try: # PyInstaller temp folder
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = path.abspath(".")
-    return "\\".join([base_path, "resources", relative_path])
-
-
 class Parser(argparse.ArgumentParser):
     """Show help menu on argparse error"""
     def error(self, message):
         fatal("error: "+message, self)
 
 
-def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=None):
+def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=None, config_dict=None):
     """Generates color scheme from image and applies to templates.
 
     Parameters:
@@ -59,7 +50,11 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         light_mode (bool): generate light mode color scheme
         templates (set): specific templates to apply (None = all from config)
         wsl (bool): whether to apply WSL (None = use config)
+        config_dict (dict): config dictionary to use (None = use global config)
     """
+
+    # Use provided config or fall back to global config
+    active_config = config_dict if config_dict is not None else config
 
     # get/create color scheme
     wal = pywal.colors.colors_to_dict(
@@ -92,9 +87,9 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         return
 
     # WSL / wpgtk
-    apply_wsl = wsl if wsl is not None else config.get("wsl")
+    apply_wsl = wsl if wsl is not None else active_config.get("wsl")
     if apply_wsl: # wpgtk
-        wsl_distro = apply_wsl if isinstance(apply_wsl, str) else config.get("wsl")
+        wsl_distro = apply_wsl if isinstance(apply_wsl, str) else active_config.get("wsl")
         if wsl_distro:
             wsl_cmd = "wsl -d " + wsl_distro
             wsl_img = convert(img)
@@ -104,36 +99,55 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
             print("Applied WSL wpgtk theme")
 
     # apply templates
-    templates_to_apply = templates if templates is not None else config.get("templates", {}).keys()
+    templates_to_apply = templates if templates is not None else active_config.get("templates", {}).keys()
     for base_name in templates_to_apply:
-        output = config.get("templates", {}).get(base_name)
+        output = active_config.get("templates", {}).get(base_name)
         if not output:
             print("Skipped %s template (not found in config)" % base_name)
             continue
         if not path.exists(template := (template_path + '\\' + base_name)):
             print("Skipped %s template (either template file or output folder is missing)" % base_name)
             continue
-        with open(template, encoding='cp850') as base:
-            base = base.read()
-            for k in wal.keys():
-                # process replacement of base, ex. {color0}
-                base = base.replace("{%s}"%k, wal[k])
-                if '{'+k+'.' in base:
-                    # process replacement of component, ex. {color0.r}/{color0.h}
-                    rgb = tuple(int(wal[k].strip("#")[i:i+2], 16) for i in (0, 2, 4))
-                    hls = rgb_to_hls(*[j/255.0 for j in rgb])
-                    hls = [str(hls[i]*100)+"%" if i > 0 else hls[i]*360 for i in range(3)]
-                    for c in range(3):
-                        base = base.replace("{%s.%s}" % (k, "rgb"[c]), str(rgb[c]))
-                        base = base.replace("{%s.%s}" % (k, "hls"[c]), str(hls[c]))
-            with open(output, "w", encoding='cp850') as output:
-                output.write(base)
-        print("Applied %s template" % base_name)
+
+        # Check if this is a .prisma template or legacy .txt template
+        if base_name.endswith('.prisma'):
+            # Use new template parser
+            try:
+                output_resolved = output.replace("HOME", home)
+                apply_template(template, wal, output_resolved)
+                print("Applied %s template (new format)" % base_name)
+            except Exception as e:
+                print("Error applying %s template: %s" % (base_name, str(e)))
+        else:
+            # Legacy .txt template handling
+            with open(template, encoding='cp850') as base:
+                base = base.read()
+                for k in wal.keys():
+                    # process replacement of base, ex. {color0}
+                    base = base.replace("{%s}"%k, wal[k])
+                    if '{'+k+'.' in base:
+                        # process replacement of component, ex. {color0.r}/{color0.h}
+                        rgb = tuple(int(wal[k].strip("#")[i:i+2], 16) for i in (0, 2, 4))
+                        hls = rgb_to_hls(*[j/255.0 for j in rgb])
+                        hls = [str(hls[i]*100)+"%" if i > 0 else hls[i]*360 for i in range(3)]
+                        for c in range(3):
+                            base = base.replace("{%s.%s}" % (k, "rgb"[c]), str(rgb[c]))
+                            base = base.replace("{%s.%s}" % (k, "hls"[c]), str(hls[c]))
+                with open(output, "w", encoding='cp850') as output:
+                    output.write(base)
+            print("Applied %s template" % base_name)
 
 
 
 def main(test_args=None, test_config=None):
     """Process flags and read current wallpaper."""
+
+    # Load configuration first (initializes data directory if needed)
+    global config
+    if not test_config:
+        config = load_config()
+    else:
+        config = test_config
 
     # Launch GUI if no arguments provided (unless --headless is specified)
     if test_args is None and len(sys.argv) == 1:
@@ -154,30 +168,6 @@ def main(test_args=None, test_config=None):
             check_output(["where", "montage"])
         except CalledProcessError:
             fatal("Imagemagick isn't installed to system path. Check README.")
-
-    global config
-    if not test_config:
-        # make data folder and config if not exist
-        if not path.isdir(data_path):
-            mkdir(data_path)
-        if not path.isdir(template_path):
-            copytree(resource("templates"), template_path)
-        if not path.isdir(licenses_path):
-            copytree(resource("licenses"), licenses_path)
-        if not path.isfile(config_path):
-            with open(resource("config_template.json")) as c:
-                config_content = c.read().replace("HOME", home)
-            with open(config_path, "w") as c:
-                c.write(config_content)
-            print("Config file created in %s.\n"
-                  "Edit if desired then run this tool again.\n" % config_path)
-            input("Press Enter to exit.")
-        else:
-            with open(config_path) as c:
-                config_content = c.read()
-        config = loads(config_content)
-    else:
-        config = test_config
 
     # parse arguments
     parser = Parser()
@@ -205,7 +195,9 @@ def main(test_args=None, test_config=None):
         templates = config.get("templates", {})
         if templates:
             for template_file, output_path in templates.items():
-                print(f"  - {template_file.replace('.txt', '').upper()}: {template_file} -> {output_path}")
+                display_name = template_file.replace('.txt', '').replace('.prisma', '').upper()
+                template_type = "prisma" if template_file.endswith('.prisma') else "legacy"
+                print(f"  - {display_name} ({template_type}): {template_file} -> {output_path}")
         else:
             print("  (no templates configured)")
         print(f"\nConfig file location: {config_path}")
