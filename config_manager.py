@@ -65,7 +65,7 @@ def initialize_data_directory():
     # Create config file if it doesn't exist
     if not path.isfile(config_path):
         try:
-            with open(resource("config_template.json")) as c:
+            with open(resource("config.json")) as c:
                 config_content = c.read().replace("HOME", home)
             with open(config_path, "w") as c:
                 c.write(config_content)
