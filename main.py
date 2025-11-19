@@ -2,19 +2,18 @@ import argparse
 from colorsys import rgb_to_hls
 from subprocess import Popen, check_output, DEVNULL, CalledProcessError
 from json import loads, dumps
-from os import path, mkdir
+from os import path
 import sys
 import pywal
 import pywal.backends.wal
-from shutil import copytree
 import winreg
 from template_parser import apply_template
+from config_manager import (
+    load_config, home, data_path, config_path,
+    template_path, licenses_path
+)
 
-home = path.expanduser("~")
-data_path = home + "\\AppData\\Local\\prisma"
-config_path = data_path + "\\config.json"
-template_path = data_path + "\\templates"
-licenses_path = data_path + "\\licenses"
+# Global config - will be loaded in main()
 config = {}
 
 # get current Windows wallpaper path
@@ -34,15 +33,6 @@ def fatal(msg, parser=None):
     if parser: # print parser help message
         parser.print_help()
     sys.exit(2)
-
-
-def resource(relative_path):
-    """Get absolute path to resource for dev/PyInstaller"""
-    try: # PyInstaller temp folder
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = path.abspath(".")
-    return "\\".join([base_path, "resources", relative_path])
 
 
 class Parser(argparse.ArgumentParser):
@@ -152,6 +142,13 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
 def main(test_args=None, test_config=None):
     """Process flags and read current wallpaper."""
 
+    # Load configuration first (initializes data directory if needed)
+    global config
+    if not test_config:
+        config = load_config()
+    else:
+        config = test_config
+
     # Launch GUI if no arguments provided (unless --headless is specified)
     if test_args is None and len(sys.argv) == 1:
         # No arguments, launch GUI
@@ -171,30 +168,6 @@ def main(test_args=None, test_config=None):
             check_output(["where", "montage"])
         except CalledProcessError:
             fatal("Imagemagick isn't installed to system path. Check README.")
-
-    global config
-    if not test_config:
-        # make data folder and config if not exist
-        if not path.isdir(data_path):
-            mkdir(data_path)
-        if not path.isdir(template_path):
-            copytree(resource("templates"), template_path)
-        if not path.isdir(licenses_path):
-            copytree(resource("licenses"), licenses_path)
-        if not path.isfile(config_path):
-            with open(resource("config_template.json")) as c:
-                config_content = c.read().replace("HOME", home)
-            with open(config_path, "w") as c:
-                c.write(config_content)
-            print("Config file created in %s.\n"
-                  "Edit if desired then run this tool again.\n" % config_path)
-            input("Press Enter to exit.")
-        else:
-            with open(config_path) as c:
-                config_content = c.read()
-        config = loads(config_content)
-    else:
-        config = test_config
 
     # parse arguments
     parser = Parser()

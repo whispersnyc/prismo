@@ -4,7 +4,8 @@ from json import loads, dumps
 from os import path, remove
 import base64
 import io
-from main import gen_colors, get_wallpaper, home, config_path
+from main import gen_colors, get_wallpaper
+from config_manager import load_config, home, config_path
 
 
 class PrismaAPI:
@@ -31,21 +32,28 @@ class PrismaAPI:
         self.load_pywal_colors()
 
     def load_config(self):
-        """Load config from file"""
+        """Load config from file using centralized config manager"""
         try:
-            if path.isfile(config_path):
-                with open(config_path, "r") as f:
-                    self.config = loads(f.read())
-                    # Initialize all templates as active by default
-                    self.active_templates = set(self.config.get("templates", {}).keys())
-                    # Initialize WSL as enabled if defined
-                    self.wsl_enabled = bool(self.config.get("wsl", "").strip())
-                print(f"Loaded config with {len(self.active_templates)} templates")
-            else:
-                print(f"Config file not found at {config_path}")
+            # Use centralized config loading (initializes data directory if needed)
+            self.config = load_config()
+            # Initialize all templates as active by default
+            self.active_templates = set(self.config.get("templates", {}).keys())
+            # Initialize WSL as enabled if defined
+            self.wsl_enabled = bool(self.config.get("wsl", "").strip())
+            print(f"Loaded config with {len(self.active_templates)} templates")
         except Exception as e:
             print(f"Error loading config: {e}")
             self.config = {}
+
+    def reload_config(self):
+        """Reload config from disk (for runtime config file changes)"""
+        print("Reloading configuration...")
+        self.load_config()
+        return {
+            "success": True,
+            "template_count": len(self.config.get("templates", {})),
+            "templates": list(self.config.get("templates", {}).keys())
+        }
 
     def get_config_info(self):
         """Get config information for UI"""
