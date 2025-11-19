@@ -305,7 +305,7 @@ class PrismoAPI:
             # Generate colors with selected templates and WSL
             apply_config = len(self.active_templates) > 0 or self.wsl_enabled
             wsl_setting = self.config.get("wsl") if self.wsl_enabled else False
-            gen_colors(
+            template_results = gen_colors(
                 adjusted_image_path,
                 apply_config=apply_config,
                 light_mode=self.light_mode,
@@ -325,7 +325,11 @@ class PrismoAPI:
                 except Exception as e:
                     print(f"Warning: Could not delete temporary file: {e}")
 
-            return {"success": True, "colors": self.colors}
+            return {
+                "success": True,
+                "colors": self.colors,
+                "template_results": template_results
+            }
         except Exception as e:
             print(f"Error generating colors: {e}")
             return {"success": False, "error": str(e)}
@@ -623,6 +627,35 @@ HTML = """
             border-color: #5588dd;
         }
 
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .btn-primary.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin-left: -8px;
+            margin-top: -8px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spinner 0.6s linear infinite;
+        }
+
+        @keyframes spinner {
+            to { transform: rotate(360deg); }
+        }
+
         .message {
             position: fixed;
             top: 20px;
@@ -642,6 +675,136 @@ HTML = """
         .message.error {
             background: #f44336;
             color: white;
+        }
+
+        /* Results Popup */
+        .results-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            border-radius: 8px;
+            padding: 20px;
+            min-width: 400px;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .results-popup.show {
+            display: block;
+        }
+
+        .results-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1999;
+            display: none;
+        }
+
+        .results-popup-overlay.show {
+            display: block;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333333;
+        }
+
+        .results-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        .results-close {
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .results-close:hover {
+            opacity: 1;
+        }
+
+        .results-section {
+            margin-bottom: 15px;
+        }
+
+        .results-section-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        .results-section-title.success {
+            color: #4CAF50;
+        }
+
+        .results-section-title.error {
+            color: #f44336;
+        }
+
+        .results-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .results-item {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 13px;
+        }
+
+        .results-item.success {
+            border-left: 3px solid #4CAF50;
+        }
+
+        .results-item.failed {
+            border-left: 3px solid #f44336;
+        }
+
+        .results-item-name {
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        .results-item-error {
+            color: #999999;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .results-summary {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #333333;
+            font-size: 13px;
+            color: #999999;
         }
     </style>
 </head>
@@ -696,7 +859,7 @@ HTML = """
                     <div class="button-group">
                         <button class="btn-icon" onclick="openSettings()" title="Settings">⚙️</button>
                         <button class="btn-toggle" id="lightModeButton" onclick="toggleLightMode()">LIGHT MODE</button>
-                        <button class="btn-primary" onclick="generateColors()">GENERATE COLORS</button>
+                        <button class="btn-primary" id="generateBtn" onclick="generateColors()">GENERATE COLORS</button>
                     </div>
                 </div>
             </div>
@@ -704,6 +867,16 @@ HTML = """
     </div>
 
     <div class="message" id="message"></div>
+
+    <!-- Results Popup -->
+    <div class="results-popup-overlay" id="resultsOverlay" onclick="closeResultsPopup()"></div>
+    <div class="results-popup" id="resultsPopup">
+        <div class="results-header">
+            <div class="results-title">Template Application Results</div>
+            <button class="results-close" onclick="closeResultsPopup()">&times;</button>
+        </div>
+        <div id="resultsContent"></div>
+    </div>
 
     <script>
         let saturationSlider = document.getElementById('saturationSlider');
@@ -831,6 +1004,31 @@ HTML = """
 
             // Update button primary color
             document.querySelector('.btn-primary').style.backgroundColor = accent;
+
+            // Update results popup theme
+            const popup = document.getElementById('resultsPopup');
+            if (popup) {
+                popup.style.backgroundColor = bg;
+                popup.style.borderColor = fg;
+
+                // Update popup text colors
+                const title = popup.querySelector('.results-title');
+                const closeBtn = popup.querySelector('.results-close');
+                if (title) title.style.color = fg;
+                if (closeBtn) closeBtn.style.color = fg;
+
+                popup.querySelectorAll('.results-section-title:not(.success):not(.error)').forEach(el => {
+                    el.style.color = fg;
+                });
+
+                popup.querySelectorAll('.results-item-name').forEach(el => {
+                    el.style.color = fg;
+                });
+
+                popup.querySelectorAll('.results-header, .results-summary').forEach(el => {
+                    el.style.borderColor = fg;
+                });
+            }
         }
 
         // Update slider thumb color dynamically
@@ -1005,20 +1203,99 @@ HTML = """
 
         // Generate colors
         async function generateColors() {
+            const generateBtn = document.getElementById('generateBtn');
+
             try {
+                // Set loading state
+                generateBtn.classList.add('loading');
+                generateBtn.disabled = true;
+
                 const result = await pywebview.api.generate_colors();
+
+                // Clear loading state
+                generateBtn.classList.remove('loading');
+                generateBtn.disabled = false;
+
                 if (result.success) {
                     currentColors = result.colors;
                     updateColorGrid(result.colors);
                     updateTheme(result.colors);
-                    showMessage('Colors generated successfully!', 'success');
+
+                    // Show results popup if templates were applied
+                    if (result.template_results &&
+                        (result.template_results.succeeded.length > 0 || result.template_results.failed.length > 0)) {
+                        showResultsPopup(result.template_results);
+                    } else {
+                        showMessage('Colors generated successfully!', 'success');
+                    }
                 } else {
                     showMessage(result.error || 'Failed to generate colors', 'error');
                 }
             } catch (e) {
                 console.error('Error generating colors:', e);
                 showMessage('Error generating colors', 'error');
+
+                // Clear loading state on error
+                generateBtn.classList.remove('loading');
+                generateBtn.disabled = false;
             }
+        }
+
+        // Show results popup
+        function showResultsPopup(results) {
+            const popup = document.getElementById('resultsPopup');
+            const overlay = document.getElementById('resultsOverlay');
+            const content = document.getElementById('resultsContent');
+
+            let html = '';
+
+            // Success section
+            if (results.succeeded && results.succeeded.length > 0) {
+                html += '<div class="results-section">';
+                html += '<div class="results-section-title success">✓ Successfully Applied (' + results.succeeded.length + ')</div>';
+                html += '<ul class="results-list">';
+                results.succeeded.forEach(template => {
+                    html += '<li class="results-item success">';
+                    html += '<div class="results-item-name">' + template + '</div>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+
+            // Failed section
+            if (results.failed && results.failed.length > 0) {
+                html += '<div class="results-section">';
+                html += '<div class="results-section-title error">✗ Failed (' + results.failed.length + ')</div>';
+                html += '<ul class="results-list">';
+                results.failed.forEach(item => {
+                    html += '<li class="results-item failed">';
+                    html += '<div class="results-item-name">' + item.name + '</div>';
+                    html += '<div class="results-item-error">' + item.error + '</div>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+
+            // Summary
+            const total = (results.succeeded ? results.succeeded.length : 0) + (results.failed ? results.failed.length : 0);
+            const successCount = results.succeeded ? results.succeeded.length : 0;
+            html += '<div class="results-summary">';
+            html += 'Total: ' + successCount + ' of ' + total + ' templates applied successfully';
+            html += '</div>';
+
+            content.innerHTML = html;
+            popup.classList.add('show');
+            overlay.classList.add('show');
+        }
+
+        // Close results popup
+        function closeResultsPopup() {
+            const popup = document.getElementById('resultsPopup');
+            const overlay = document.getElementById('resultsOverlay');
+            popup.classList.remove('show');
+            overlay.classList.remove('show');
         }
 
         // Show message

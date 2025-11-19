@@ -52,10 +52,20 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         templates (set): specific templates to apply (None = all from config)
         wsl (bool): whether to apply WSL (None = use config)
         config_dict (dict): config dictionary to use (None = use global config)
+
+    Returns:
+        dict: Results with template application status
+            {
+                "succeeded": [template_name1, template_name2, ...],
+                "failed": [{"name": template_name, "error": error_msg}, ...]
+            }
     """
 
     # Use provided config or fall back to global config
     active_config = config_dict if config_dict is not None else config
+
+    # Track template application results
+    results = {"succeeded": [], "failed": []}
 
     # get/create color scheme
     wal = pywal.colors.colors_to_dict(
@@ -85,7 +95,7 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
 
     # apply config options if specified
     if not apply_config:
-        return
+        return results
 
     # WSL / wpgtk
     apply_wsl = wsl if wsl is not None else active_config.get("wsl")
@@ -104,7 +114,9 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
     for base_name in templates_to_apply:
         output = active_config.get("templates", {}).get(base_name)
         if not output:
-            print("Skipped %s template (not found in config)" % base_name)
+            error_msg = "Not found in config"
+            print("Skipped %s template (%s)" % (base_name, error_msg))
+            results["failed"].append({"name": base_name, "error": error_msg})
             continue
 
         # Automatically append .prismo extension if not present
@@ -112,16 +124,23 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         template = template_path + '\\' + template_file
 
         if not path.exists(template):
-            print("Skipped %s template (template file is missing: %s)" % (base_name, template_file))
+            error_msg = "Template file is missing: %s" % template_file
+            print("Skipped %s template (%s)" % (base_name, error_msg))
+            results["failed"].append({"name": base_name, "error": error_msg})
             continue
 
-        # Use new .prismo template parser
+        # Use new .prismo template parser - continue on failure
         try:
             output_resolved = os.path.expandvars(os.path.expanduser(output))
             apply_template(template, wal, output_resolved)
             print("Applied %s template to %s" % (base_name, output_resolved))
+            results["succeeded"].append(base_name)
         except Exception as e:
-            print("Error applying %s template: %s" % (base_name, str(e)))
+            error_msg = str(e)
+            print("Error applying %s template: %s" % (base_name, error_msg))
+            results["failed"].append({"name": base_name, "error": error_msg})
+
+    return results
 
 
 
