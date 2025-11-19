@@ -23,7 +23,7 @@ class PrismoAPI:
         self.adjusted_image_path = None
         self.config = {}
         self.active_templates = set()  # Track which templates are active
-        self.wsl_enabled = False  # Track if WSL is enabled
+        self.wsl_distros = []  # Track WSL distros to apply
 
         # Load config
         self.load_config()
@@ -38,8 +38,8 @@ class PrismoAPI:
             self.config = load_config()
             # Initialize all templates as active by default
             self.active_templates = set(self.config.get("templates", {}).keys())
-            # Initialize WSL as enabled if defined
-            self.wsl_enabled = bool(self.config.get("wsl", "").strip())
+            # Initialize WSL distros from config
+            self.wsl_distros = self.config.get("wsl", [])
             # Initialize light mode from config
             self.light_mode = self.config.get("light_mode", False)
             print(f"Loaded config with {len(self.active_templates)} templates")
@@ -81,12 +81,11 @@ class PrismoAPI:
                 "enabled": False
             }
 
-        wsl_info = None
-        if self.config.get("wsl", "").strip():
-            wsl_info = {
-                "name": self.config["wsl"],
-                "active": self.wsl_enabled
-            }
+        # Always return WSL info (even if empty)
+        wsl_info = {
+            "distros": self.wsl_distros,
+            "active": len(self.wsl_distros) > 0
+        }
 
         return {
             "templates": templates,
@@ -131,10 +130,28 @@ class PrismoAPI:
 
         return is_enabled
 
-    def toggle_wsl(self):
-        """Toggle WSL on/off"""
-        self.wsl_enabled = not self.wsl_enabled
-        return self.wsl_enabled
+    def get_wsl_distros(self):
+        """Get current WSL distros list"""
+        return self.wsl_distros
+
+    def set_wsl_distros(self, distros):
+        """Set WSL distros and persist to config"""
+        import yaml
+
+        self.wsl_distros = distros if isinstance(distros, list) else []
+        self.config["wsl"] = self.wsl_distros
+
+        # Save config to file
+        try:
+            with open(config_path, 'w') as f:
+                yaml.dump(self.config, f, default_flow_style=False, sort_keys=False)
+            print(f"Updated config: wsl = {self.wsl_distros}")
+        except Exception as e:
+            print(f"Error saving config: {e}")
+            # Revert changes on error
+            self.load_config()
+
+        return self.wsl_distros
 
     def open_config_in_editor(self):
         """Open config file in default editor"""
@@ -363,14 +380,14 @@ class PrismoAPI:
             self.adjusted_image_path = adjusted_image_path if is_adjusted else None
 
             # Generate colors with selected templates and WSL
-            apply_config = len(self.active_templates) > 0 or self.wsl_enabled
-            wsl_setting = self.config.get("wsl") if self.wsl_enabled else False
+            apply_config = len(self.active_templates) > 0 or len(self.wsl_distros) > 0
+            wsl_setting = self.wsl_distros if len(self.wsl_distros) > 0 else None
             template_results = gen_colors(
                 adjusted_image_path,
                 apply_config=apply_config,
                 light_mode=self.light_mode,
                 templates=self.active_templates if apply_config else None,
-                wsl=wsl_setting if apply_config else False,
+                wsl=wsl_setting if apply_config else None,
                 config_dict=self.config
             )
 
@@ -839,6 +856,20 @@ HTML = """
             opacity: 1;
         }
 
+        .results-category-header {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e0e0e0;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #444444;
+        }
+
+        .results-category-header:first-child {
+            margin-top: 0;
+        }
+
         .results-section {
             margin-bottom: 15px;
         }
@@ -897,6 +928,159 @@ HTML = """
             border-top: 1px solid #333333;
             font-size: 13px;
             color: #999999;
+        }
+
+        /* WSL Modal */
+        .wsl-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            border-radius: 8px;
+            padding: 0;
+            min-width: 500px;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow: hidden;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .wsl-modal.show {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .wsl-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #333333;
+            flex-shrink: 0;
+        }
+
+        .wsl-modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+
+        .wsl-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .wsl-modal-description {
+            margin-bottom: 15px;
+            color: #999999;
+            font-size: 14px;
+        }
+
+        .wsl-distro-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .wsl-distro-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .wsl-distro-input {
+            flex: 1;
+            padding: 10px;
+            background: #0a0a0a;
+            border: 1px solid #333333;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .wsl-distro-input:focus {
+            border-color: #5588dd;
+        }
+
+        .wsl-delete-btn {
+            width: 36px;
+            height: 36px;
+            background: #333333;
+            border: 1px solid #555555;
+            color: #e0e0e0;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wsl-delete-btn:hover {
+            background: #f44336;
+            border-color: #f44336;
+            color: #ffffff;
+        }
+
+        .wsl-add-btn {
+            width: 100%;
+            padding: 10px;
+            background: #333333;
+            border: 1px solid #555555;
+            color: #e0e0e0;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .wsl-add-btn:hover {
+            background: #444444;
+        }
+
+        .wsl-modal-footer {
+            display: flex;
+            gap: 10px;
+            padding: 20px;
+            border-top: 1px solid #333333;
+            justify-content: flex-end;
+            flex-shrink: 0;
+        }
+
+        .btn-cancel {
+            padding: 10px 24px;
+            background: #333333;
+            border: 1px solid #555555;
+            color: #e0e0e0;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: #444444;
+        }
+
+        .btn-confirm {
+            padding: 10px 24px;
+            background: #5588dd;
+            border: 1px solid #5588dd;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-confirm:hover {
+            opacity: 0.9;
         }
     </style>
 </head>
@@ -990,6 +1174,26 @@ HTML = """
             <button class="results-close" onclick="closeResultsPopup()">&times;</button>
         </div>
         <div id="resultsContent"></div>
+    </div>
+
+    <!-- WSL Modal -->
+    <div class="results-popup-overlay" id="wslOverlay" onclick="closeWSLModal()"></div>
+    <div class="wsl-modal" id="wslModal">
+        <div class="wsl-modal-header">
+            <div class="wsl-modal-title">Configure WSL Distros</div>
+            <button class="results-close" onclick="closeWSLModal()">&times;</button>
+        </div>
+        <div class="wsl-modal-body">
+            <p class="wsl-modal-description">Add the WSL distributions you want to theme:</p>
+            <div id="wslDistroList" class="wsl-distro-list">
+                <!-- Distro rows will be added here dynamically -->
+            </div>
+            <button class="wsl-add-btn" onclick="addWSLDistroRow('')">+ Add Distro</button>
+        </div>
+        <div class="wsl-modal-footer">
+            <button class="btn-cancel" onclick="closeWSLModal()">Cancel</button>
+            <button class="btn-confirm" onclick="saveWSLDistros()">Confirm</button>
+        </div>
     </div>
 
     <script>
@@ -1187,6 +1391,42 @@ HTML = """
                     el.style.borderColor = fg;
                 });
             }
+
+            // Update WSL modal theme
+            const wslModal = document.getElementById('wslModal');
+            if (wslModal) {
+                wslModal.style.backgroundColor = bg;
+                wslModal.style.borderColor = fg;
+
+                // Update modal header
+                const modalTitle = wslModal.querySelector('.wsl-modal-title');
+                const modalClose = wslModal.querySelector('.results-close');
+                if (modalTitle) modalTitle.style.color = fg;
+                if (modalClose) modalClose.style.color = fg;
+
+                wslModal.querySelectorAll('.wsl-modal-header, .wsl-modal-footer').forEach(el => {
+                    el.style.borderColor = fg;
+                });
+
+                // Update description text
+                wslModal.querySelectorAll('.wsl-modal-description').forEach(el => {
+                    el.style.color = fg;
+                });
+
+                // Update inputs
+                wslModal.querySelectorAll('.wsl-distro-input').forEach(input => {
+                    input.style.backgroundColor = bg;
+                    input.style.borderColor = fg;
+                    input.style.color = fg;
+                });
+
+                // Update confirm button
+                const confirmBtn = wslModal.querySelector('.btn-confirm');
+                if (confirmBtn) {
+                    confirmBtn.style.backgroundColor = accent;
+                    confirmBtn.style.borderColor = accent;
+                }
+            }
         }
 
         // Update slider thumb color dynamically
@@ -1285,12 +1525,15 @@ HTML = """
                     templateButtons.appendChild(button);
                 }
 
-                // Add WSL button if configured
+                // Always add WSL button
                 if (configInfo.wsl) {
                     const button = document.createElement('button');
                     button.className = 'btn-template' + (configInfo.wsl.active ? ' active' : '');
-                    button.textContent = 'WSL (' + configInfo.wsl.name.toUpperCase() + ')';
-                    button.onclick = () => toggleWSL(button);
+                    const distroCount = configInfo.wsl.distros.length;
+                    button.textContent = distroCount > 0
+                        ? `WSL (${distroCount} ${distroCount === 1 ? 'DISTRO' : 'DISTROS'})`
+                        : 'WSL (NONE)';
+                    button.onclick = () => openWSLModal();
                     templateButtons.appendChild(button);
                 }
 
@@ -1331,21 +1574,104 @@ HTML = """
             }
         }
 
-        // Toggle WSL
-        async function toggleWSL(button) {
+        // Open WSL modal
+        async function openWSLModal() {
             try {
-                const isActive = await pywebview.api.toggle_wsl();
-                if (isActive) {
-                    button.classList.add('active');
+                const distros = await pywebview.api.get_wsl_distros();
+                const modal = document.getElementById('wslModal');
+                const overlay = document.getElementById('wslOverlay');
+                const distroList = document.getElementById('wslDistroList');
+
+                // Clear existing rows
+                distroList.innerHTML = '';
+
+                // Add rows for existing distros
+                if (distros && distros.length > 0) {
+                    distros.forEach(distro => {
+                        addWSLDistroRow(distro);
+                    });
                 } else {
-                    button.classList.remove('active');
+                    // Add one empty row to start
+                    addWSLDistroRow('');
                 }
-                // Reapply theme to update button colors
-                if (currentColors) {
-                    updateTheme(currentColors);
-                }
+
+                // Show modal
+                modal.classList.add('show');
+                overlay.classList.add('show');
+
+                // Focus first input
+                const firstInput = distroList.querySelector('input');
+                if (firstInput) firstInput.focus();
             } catch (e) {
-                console.error('Error toggling WSL:', e);
+                console.error('Error opening WSL modal:', e);
+            }
+        }
+
+        // Close WSL modal
+        function closeWSLModal() {
+            const modal = document.getElementById('wslModal');
+            const overlay = document.getElementById('wslOverlay');
+            modal.classList.remove('show');
+            overlay.classList.remove('show');
+        }
+
+        // Add distro row
+        function addWSLDistroRow(value = '') {
+            const distroList = document.getElementById('wslDistroList');
+            const row = document.createElement('div');
+            row.className = 'wsl-distro-row';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'wsl-distro-input';
+            input.placeholder = 'Distro name (e.g., Ubuntu)';
+            input.value = value;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'wsl-delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.onclick = () => {
+                row.remove();
+                // If no rows left, add an empty one
+                if (distroList.children.length === 0) {
+                    addWSLDistroRow('');
+                }
+            };
+
+            row.appendChild(input);
+            row.appendChild(deleteBtn);
+            distroList.appendChild(row);
+        }
+
+        // Save WSL distros
+        async function saveWSLDistros() {
+            try {
+                const distroList = document.getElementById('wslDistroList');
+                const inputs = distroList.querySelectorAll('.wsl-distro-input');
+                const distros = [];
+
+                // Collect non-empty distro names
+                inputs.forEach(input => {
+                    const value = input.value.trim();
+                    if (value) {
+                        distros.push(value);
+                    }
+                });
+
+                // Save to backend
+                await pywebview.api.set_wsl_distros(distros);
+
+                // Reload template buttons to reflect changes
+                await loadTemplateButtons();
+
+                // Close modal
+                closeWSLModal();
+
+                // Show success message
+                showMessage(`WSL distros updated: ${distros.length > 0 ? distros.join(', ') : 'none'}`, 'success');
+            } catch (e) {
+                console.error('Error saving WSL distros:', e);
+                showMessage('Error saving WSL distros', 'error');
             }
         }
 
@@ -1424,9 +1750,13 @@ HTML = """
                     updateColorGrid(result.colors);
                     updateTheme(result.colors);
 
-                    // Show results popup if templates were applied
-                    if (result.template_results &&
-                        (result.template_results.succeeded.length > 0 || result.template_results.failed.length > 0)) {
+                    // Show results popup if templates or WSL were applied
+                    const hasTemplateResults = result.template_results &&
+                        (result.template_results.succeeded.length > 0 || result.template_results.failed.length > 0);
+                    const hasWSLResults = result.template_results &&
+                        (result.template_results.wsl_succeeded.length > 0 || result.template_results.wsl_failed.length > 0);
+
+                    if (hasTemplateResults || hasWSLResults) {
                         showResultsPopup(result.template_results);
                     } else {
                         showMessage('Colors generated successfully!', 'success');
@@ -1452,7 +1782,13 @@ HTML = """
 
             let html = '';
 
-            // Success section
+            // Templates section header
+            const hasTemplateResults = (results.succeeded && results.succeeded.length > 0) || (results.failed && results.failed.length > 0);
+            if (hasTemplateResults) {
+                html += '<div class="results-category-header">Templates</div>';
+            }
+
+            // Template success section
             if (results.succeeded && results.succeeded.length > 0) {
                 html += '<div class="results-section">';
                 html += '<div class="results-section-title success">✓ Successfully Applied (' + results.succeeded.length + ')</div>';
@@ -1466,7 +1802,7 @@ HTML = """
                 html += '</div>';
             }
 
-            // Failed section
+            // Template failed section
             if (results.failed && results.failed.length > 0) {
                 html += '<div class="results-section">';
                 html += '<div class="results-section-title error">✗ Failed (' + results.failed.length + ')</div>';
@@ -1481,11 +1817,57 @@ HTML = """
                 html += '</div>';
             }
 
+            // WSL section header
+            const hasWSLResults = (results.wsl_succeeded && results.wsl_succeeded.length > 0) || (results.wsl_failed && results.wsl_failed.length > 0);
+            if (hasWSLResults) {
+                html += '<div class="results-category-header">WSL Distros</div>';
+            }
+
+            // WSL success section
+            if (results.wsl_succeeded && results.wsl_succeeded.length > 0) {
+                html += '<div class="results-section">';
+                html += '<div class="results-section-title success">✓ Successfully Applied (' + results.wsl_succeeded.length + ')</div>';
+                html += '<ul class="results-list">';
+                results.wsl_succeeded.forEach(distro => {
+                    html += '<li class="results-item success">';
+                    html += '<div class="results-item-name">' + distro + '</div>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+
+            // WSL failed section
+            if (results.wsl_failed && results.wsl_failed.length > 0) {
+                html += '<div class="results-section">';
+                html += '<div class="results-section-title error">✗ Failed (' + results.wsl_failed.length + ')</div>';
+                html += '<ul class="results-list">';
+                results.wsl_failed.forEach(item => {
+                    html += '<li class="results-item failed">';
+                    html += '<div class="results-item-name">' + item.name + '</div>';
+                    html += '<div class="results-item-error">' + item.error + '</div>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+                html += '</div>';
+            }
+
             // Summary
-            const total = (results.succeeded ? results.succeeded.length : 0) + (results.failed ? results.failed.length : 0);
-            const successCount = results.succeeded ? results.succeeded.length : 0;
+            const templateTotal = (results.succeeded ? results.succeeded.length : 0) + (results.failed ? results.failed.length : 0);
+            const templateSuccess = results.succeeded ? results.succeeded.length : 0;
+            const wslTotal = (results.wsl_succeeded ? results.wsl_succeeded.length : 0) + (results.wsl_failed ? results.wsl_failed.length : 0);
+            const wslSuccess = results.wsl_succeeded ? results.wsl_succeeded.length : 0;
+
             html += '<div class="results-summary">';
-            html += 'Total: ' + successCount + ' of ' + total + ' templates applied successfully';
+            if (hasTemplateResults) {
+                html += 'Templates: ' + templateSuccess + ' of ' + templateTotal + ' applied successfully';
+            }
+            if (hasTemplateResults && hasWSLResults) {
+                html += '<br>';
+            }
+            if (hasWSLResults) {
+                html += 'WSL Distros: ' + wslSuccess + ' of ' + wslTotal + ' applied successfully';
+            }
             html += '</div>';
 
             content.innerHTML = html;

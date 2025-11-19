@@ -186,8 +186,8 @@ def get_config_info():
         "template_path": template_path,
         "template_count": len(config.get("templates", {})),
         "templates": list(config.get("templates", {}).keys()),
-        "wsl_enabled": bool(config.get("wsl", "").strip()),
-        "wsl_distro": config.get("wsl", ""),
+        "wsl_enabled": bool(config.get("wsl", [])),
+        "wsl_distros": config.get("wsl", []),
         "light_mode": config.get("light_mode", False)
     }
 

@@ -4,10 +4,9 @@ disabled:
     win-terminal: '%localappdata%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
     alacritty: '~\alacritty\alacritty.totml'
 # WSL distros for wpgtk theme application
-# Examples:
-#   Single distro (string):    wsl: 'Ubuntu'
-#   Multiple distros (list):   wsl: ['Ubuntu', 'Debian']
-#   Comma-separated (string):  wsl: 'Ubuntu,Debian'
-#   Disabled (empty):          wsl: ''
-wsl: ''
+# List format only:
+#   No distros (none):         wsl: []
+#   Single distro:             wsl: ['Ubuntu']
+#   Multiple distros:          wsl: ['Ubuntu', 'Debian']
+wsl: []
 light_mode: false
