@@ -119,7 +119,7 @@ This is an optional section for those who want to modify the code and execute us
 
 The respective licenses are in the [repo resources folder](https://github.com/rakinishraq/prisma/tree/main/resources/licenses) and copied into the Local Appdata folder.
 
-- Discord template from [pywal-discord](https://github.com/FilipLitwora/pywal-discord) d12972d by FilipLitwora (GNU General Public License v3.0)
+- Discord template from [pywal-discord](https://github.com/FilipLitwora/pywal-discord) by franekxtb/NecRaul (GNU General Public License v3.0)
   - changes: colors of theme subsituted in theme css file
 - Obsidian template from [pywal-obsidianmd](https://github.com/poach3r/pywal-obsidianmd) by poach3r (unlicensed)
   - changed formatting and some background colors
