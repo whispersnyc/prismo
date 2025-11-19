@@ -477,6 +477,37 @@ HTML = """
             overflow-x: hidden;
         }
 
+        /* Scrollbar Styling - WebKit browsers (Chrome, Edge, Safari) */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #000000;
+            border-left: 1px solid #333333;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 6px;
+            border: 2px solid #000000;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555555;
+        }
+
+        ::-webkit-scrollbar-thumb:active {
+            background: #808080;
+        }
+
+        /* Scrollbar Styling - Firefox */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #333333 #000000;
+        }
+
         .panel {
             background: #000000;
             border: 1px solid #808080;
@@ -1320,6 +1351,9 @@ HTML = """
             // Update slider thumbs to use foreground color
             updateSliderThumbColor(fg);
 
+            // Update scrollbar colors
+            updateScrollbarColors(bg, fg, accent);
+
             // Update slider track background
             document.querySelectorAll('input[type="range"]').forEach(slider => {
                 slider.style.background = accent;
@@ -1447,6 +1481,44 @@ HTML = """
                 }
                 input[type="range"]::-moz-range-thumb {
                     background: ${color} !important;
+                }
+            `;
+        }
+
+        // Update scrollbar colors dynamically
+        function updateScrollbarColors(bg, fg, accent) {
+            // Create or update style element for scrollbars
+            let styleId = 'scrollbar-style';
+            let styleEl = document.getElementById(styleId);
+
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+
+            // Use a slightly lighter color than bg for the thumb
+            const thumbColor = fg.length === 7 ? fg + '40' : 'rgba(128, 128, 128, 0.3)'; // Add transparency
+            const thumbHoverColor = fg.length === 7 ? fg + '60' : 'rgba(128, 128, 128, 0.4)';
+            const thumbActiveColor = accent;
+
+            styleEl.textContent = `
+                ::-webkit-scrollbar-track {
+                    background: ${bg} !important;
+                    border-left: 1px solid ${fg}40 !important;
+                }
+                ::-webkit-scrollbar-thumb {
+                    background: ${thumbColor} !important;
+                    border: 2px solid ${bg} !important;
+                }
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${thumbHoverColor} !important;
+                }
+                ::-webkit-scrollbar-thumb:active {
+                    background: ${thumbActiveColor} !important;
+                }
+                * {
+                    scrollbar-color: ${thumbColor} ${bg} !important;
                 }
             `;
         }
