@@ -33,6 +33,7 @@ class PrismoAPI:
         self.default_wallpaper_path = None  # Track default wallpaper for reset
         self.custom_image_loaded = False  # Track if custom image was loaded
         self.light_mode = False
+        self.pywalfox = False
         self.colors = {}
         self.saturation = 50
         self.contrast = 50
@@ -59,6 +60,8 @@ class PrismoAPI:
             self.wsl_distros = self.config.get("wsl", [])
             # Initialize light mode from config
             self.light_mode = self.config.get("light_mode", False)
+            # Initialize pywalfox from config
+            self.pywalfox = self.config.get("pywalfox", False)
             print(f"Loaded config with {len(self.active_templates)} templates")
         except Exception as e:
             print(f"Error loading config: {e}")
@@ -107,7 +110,8 @@ class PrismoAPI:
         return {
             "templates": templates,
             "wsl": wsl_info,
-            "light_mode": self.light_mode
+            "light_mode": self.light_mode,
+            "pywalfox": self.pywalfox
         }
 
     def toggle_template(self, template_file):
@@ -348,6 +352,22 @@ class PrismoAPI:
 
         return active
 
+    def toggle_pywalfox(self, active):
+        """Toggle pywalfox and persist to config"""
+        self.pywalfox = active
+        self.config["pywalfox"] = active
+
+        # Save config to file
+        try:
+            save_config(self.config, config_path)
+            print(f"Updated config: pywalfox = {active}")
+        except Exception as e:
+            print(f"Error saving config: {e}")
+            # Revert changes on error
+            self.load_config()
+
+        return active
+
     def adjust_and_save_image(self, image_path):
         """Adjust and save image with saturation and contrast"""
         try:
@@ -396,6 +416,7 @@ class PrismoAPI:
                 light_mode=self.light_mode,
                 templates=self.active_templates if apply_config else None,
                 wsl=wsl_setting if apply_config else None,
+                pywalfox=self.pywalfox,
                 config_dict=self.config
             )
 
@@ -1195,6 +1216,7 @@ HTML = """
                         <button class="btn-icon" onclick="openSettings()" title="Settings">
                             <svg class="icon"><use xlink:href="#icon-cog" href="#icon-cog"/></svg>
                         </button>
+                        <button class="btn-toggle" id="pywalfoxButton" onclick="togglePywalfox()">PYWALFOX</button>
                         <button class="btn-toggle" id="lightModeButton" onclick="toggleLightMode()">LIGHT MODE</button>
                         <button class="btn-primary" id="generateBtn" onclick="generateColors()">GENERATE COLORS</button>
                     </div>
@@ -1243,8 +1265,10 @@ HTML = """
         let imagePreview = document.getElementById('imagePreview');
         let colorGrid = document.getElementById('colorGrid');
         let lightModeButton = document.getElementById('lightModeButton');
+        let pywalfoxButton = document.getElementById('pywalfoxButton');
         let imageButton = document.getElementById('imageButton');
         let isLightMode = false;
+        let isPywalfox = false;
         let currentColors = {};
 
         // Initialize - wait for pywebview to be ready
@@ -1393,6 +1417,14 @@ HTML = """
                 lightModeButton.style.backgroundColor = accent;
                 lightModeButton.style.borderColor = accent;
                 lightModeButton.style.color = '#ffffff';
+            }
+
+            // Update pywalfox toggle button
+            const pywalfoxButton = document.getElementById('pywalfoxButton');
+            if (pywalfoxButton) {
+                pywalfoxButton.style.backgroundColor = accent;
+                pywalfoxButton.style.borderColor = accent;
+                pywalfoxButton.style.color = '#ffffff';
             }
 
             // Update template toggle buttons (active and inactive)
@@ -1625,6 +1657,14 @@ HTML = """
                     lightModeButton.classList.remove('active');
                 }
 
+                // Initialize pywalfox state from config
+                isPywalfox = configInfo.pywalfox || false;
+                if (isPywalfox) {
+                    pywalfoxButton.classList.add('active');
+                } else {
+                    pywalfoxButton.classList.remove('active');
+                }
+
                 // Apply theme to newly loaded buttons
                 if (currentColors) {
                     updateTheme(currentColors);
@@ -1774,6 +1814,28 @@ HTML = """
                 showMessage('Error toggling light mode', 'error');
                 // Revert on error
                 isLightMode = !isLightMode;
+            }
+        }
+
+        // Toggle pywalfox
+        async function togglePywalfox() {
+            isPywalfox = !isPywalfox;
+
+            try {
+                await pywebview.api.toggle_pywalfox(isPywalfox);
+
+                if (isPywalfox) {
+                    pywalfoxButton.classList.add('active');
+                    showMessage('Pywalfox enabled', 'success');
+                } else {
+                    pywalfoxButton.classList.remove('active');
+                    showMessage('Pywalfox disabled', 'success');
+                }
+            } catch (e) {
+                console.error('Error toggling pywalfox:', e);
+                showMessage('Error toggling pywalfox', 'error');
+                // Revert on error
+                isPywalfox = !isPywalfox;
             }
         }
 

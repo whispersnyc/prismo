@@ -42,7 +42,7 @@ class Parser(argparse.ArgumentParser):
         fatal("error: "+message, self)
 
 
-def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=None, config_dict=None):
+def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=None, pywalfox=None, config_dict=None):
     """Generates color scheme from image and applies to templates.
 
     Parameters:
@@ -51,6 +51,7 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         light_mode (bool): generate light mode color scheme
         templates (set): specific templates to apply (None = all from config)
         wsl (list or None): list of WSL distros to apply (None = use config, [] = skip with message)
+        pywalfox (bool or None): whether to update pywalfox (None = use config, True/False = override)
         config_dict (dict): config dictionary to use (None = use global config)
 
     Returns:
@@ -85,12 +86,14 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         cj.write(dumps(wal, indent=4))
     print("Updated colors.json with formatted output: " + json_path)
 
-    # pywalfox update
-    try:
-        Popen(["python", "-m", "pywalfox", "update"])
-        print("Pywalfox updated")
-    except Exception:
-        print("Pywalfox not updated")
+    # pywalfox update - check config or parameter
+    should_update_pywalfox = pywalfox if pywalfox is not None else active_config.get("pywalfox", False)
+    if should_update_pywalfox:
+        try:
+            Popen(["python", "-m", "pywalfox", "update"])
+            print("Pywalfox updated")
+        except Exception:
+            print("Pywalfox not updated")
 
     # process color scheme
     wal["colors"].update(wal["special"])
@@ -249,6 +252,9 @@ def main(test_args=None, test_config=None, custom_config_path=None):
             help="apply WSL/wpgtk theme. Accepts comma-separated distro names (e.g., 'Ubuntu,Debian'). "
                  "With no arguments: uses config value. "
                  "With arguments: applies to specified distros (overrides config)")
+    parser.add_argument("-p", "--pywalfox", nargs="?", const=True, default=None, type=lambda x: x.lower() in ['true', '1', 'yes'],
+            help="update pywalfox extension. With no arguments: enables pywalfox. "
+                 "With arguments: true/false to enable/disable (overrides config)")
     parser.add_argument("filepath", nargs="?", default=None,
             help="optional path to image file (if not provided, uses current wallpaper)")
     args = parser.parse_args(test_args)
@@ -361,7 +367,8 @@ def main(test_args=None, test_config=None, custom_config_path=None):
             apply_config=apply_config,
             light_mode=light_mode,
             templates=templates_to_apply,
-            wsl=wsl_distros
+            wsl=wsl_distros,
+            pywalfox=args.pywalfox
         )
     except Exception as e:
         fatal("Error generating colors from wallpaper: " + str(e) + "\n"
