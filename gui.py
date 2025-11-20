@@ -1227,11 +1227,11 @@ HTML = """
             <!-- Controls -->
             <div class="panel">
                 <div class="controls">
-                    <div class="button-group">
+                    <div class="button-group" id="buttonGroup">
                         <button class="btn-icon" onclick="openSettings()" title="Settings">
                             <svg class="icon"><use xlink:href="#icon-cog" href="#icon-cog"/></svg>
                         </button>
-                        <button class="btn-toggle" id="lightModeButton" onclick="toggleLightMode()">LIGHT MODE</button>
+                        <!-- Light Mode button will be inserted here dynamically -->
                         <button class="btn-primary" id="generateBtn" onclick="generateColors()">GENERATE COLORS</button>
                         <button class="btn-icon" title="Help">
                             <svg class="icon"><use xlink:href="#icon-question" href="#icon-question"/></svg>
@@ -1281,7 +1281,6 @@ HTML = """
         let contrastValue = document.getElementById('contrastValue');
         let imagePreview = document.getElementById('imagePreview');
         let colorGrid = document.getElementById('colorGrid');
-        let lightModeButton = document.getElementById('lightModeButton');
         let imageButton = document.getElementById('imageButton');
         let isLightMode = false;
         let isPywalfox = false;
@@ -1427,19 +1426,18 @@ HTML = """
                 btn.style.color = fg;
             });
 
-            // Update light mode toggle button
-            const lightModeButton = document.getElementById('lightModeButton');
-            if (lightModeButton) {
-                if (lightModeButton.classList.contains('active')) {
-                    lightModeButton.style.backgroundColor = accent;
-                    lightModeButton.style.borderColor = accent;
-                    lightModeButton.style.color = '#ffffff';
+            // Update toggle buttons (Light Mode and templates - active and inactive)
+            document.querySelectorAll('.btn-toggle').forEach(btn => {
+                if (btn.classList.contains('active')) {
+                    btn.style.backgroundColor = accent;
+                    btn.style.borderColor = accent;
+                    btn.style.color = '#ffffff';
                 } else {
-                    lightModeButton.style.backgroundColor = bg;
-                    lightModeButton.style.borderColor = fg;
-                    lightModeButton.style.color = fg;
+                    btn.style.backgroundColor = bg;
+                    btn.style.borderColor = fg;
+                    btn.style.color = fg;
                 }
-            }
+            });
 
             // Update template toggle buttons (active and inactive)
             const templateButtons = document.querySelectorAll('.btn-template');
@@ -1672,14 +1670,29 @@ HTML = """
 
                 // Initialize light mode state from config
                 isLightMode = configInfo.light_mode || false;
-                if (isLightMode) {
-                    lightModeButton.classList.add('active');
-                } else {
-                    lightModeButton.classList.remove('active');
-                }
 
                 // Initialize pywalfox state from config
                 isPywalfox = configInfo.pywalfox || false;
+
+                // Add Light Mode button to controls (insert before GENERATE COLORS button)
+                const buttonGroup = document.getElementById('buttonGroup');
+                const generateBtn = document.getElementById('generateBtn');
+
+                // Remove existing light mode button if it exists
+                const existingLightMode = document.getElementById('lightModeButton');
+                if (existingLightMode) {
+                    existingLightMode.remove();
+                }
+
+                // Create Light Mode button
+                const lightModeButton = document.createElement('button');
+                lightModeButton.id = 'lightModeButton';
+                lightModeButton.className = 'btn-toggle' + (isLightMode ? ' active' : '');
+                lightModeButton.textContent = 'LIGHT MODE';
+                lightModeButton.onclick = () => toggleLightMode();
+
+                // Insert before GENERATE COLORS button
+                buttonGroup.insertBefore(lightModeButton, generateBtn);
 
                 // Apply theme to newly loaded buttons
                 if (currentColors) {
@@ -1818,29 +1831,13 @@ HTML = """
             try {
                 await pywebview.api.toggle_light_mode(isLightMode);
 
+                // Reload template buttons to reflect changes
+                await loadTemplateButtons();
+
                 if (isLightMode) {
-                    lightModeButton.classList.add('active');
                     showMessage('Light mode enabled', 'success');
                 } else {
-                    lightModeButton.classList.remove('active');
                     showMessage('Light mode disabled', 'success');
-                }
-
-                // Update button appearance immediately with current colors
-                if (currentColors && currentColors.special) {
-                    const bg = currentColors.special.background;
-                    const fg = currentColors.special.foreground;
-                    const accent = currentColors.colors.color1;
-
-                    if (isLightMode) {
-                        lightModeButton.style.backgroundColor = accent;
-                        lightModeButton.style.borderColor = accent;
-                        lightModeButton.style.color = '#ffffff';
-                    } else {
-                        lightModeButton.style.backgroundColor = bg;
-                        lightModeButton.style.borderColor = fg;
-                        lightModeButton.style.color = fg;
-                    }
                 }
             } catch (e) {
                 console.error('Error toggling light mode:', e);
