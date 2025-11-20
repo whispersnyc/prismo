@@ -1825,6 +1825,23 @@ HTML = """
                     lightModeButton.classList.remove('active');
                     showMessage('Light mode disabled', 'success');
                 }
+
+                // Update button appearance immediately with current colors
+                if (currentColors && currentColors.special) {
+                    const bg = currentColors.special.background;
+                    const fg = currentColors.special.foreground;
+                    const accent = currentColors.colors.color1;
+
+                    if (isLightMode) {
+                        lightModeButton.style.backgroundColor = accent;
+                        lightModeButton.style.borderColor = accent;
+                        lightModeButton.style.color = '#ffffff';
+                    } else {
+                        lightModeButton.style.backgroundColor = bg;
+                        lightModeButton.style.borderColor = fg;
+                        lightModeButton.style.color = fg;
+                    }
+                }
             } catch (e) {
                 console.error('Error toggling light mode:', e);
                 showMessage('Error toggling light mode', 'error');
