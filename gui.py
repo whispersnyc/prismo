@@ -403,9 +403,14 @@ class PrismoAPI:
         is_adjusted = (self.saturation != 50 or self.contrast != 50)
 
         try:
-            # Adjust and save image
-            adjusted_image_path = self.adjust_and_save_image(self.current_image_path)
-            self.adjusted_image_path = adjusted_image_path if is_adjusted else None
+            # Only create adjusted image if settings are non-default
+            if is_adjusted:
+                adjusted_image_path = self.adjust_and_save_image(self.current_image_path)
+                self.adjusted_image_path = adjusted_image_path
+            else:
+                # Use original image if no adjustments needed
+                adjusted_image_path = self.current_image_path
+                self.adjusted_image_path = None
 
             # Generate colors with selected templates and WSL
             apply_config = len(self.active_templates) > 0 or len(self.wsl_distros) > 0
@@ -423,11 +428,12 @@ class PrismoAPI:
             # Reload colors
             self.load_pywal_colors()
 
-            # Clean up temporary file
+            # Clean up temporary file if one was created
             if is_adjusted and self.adjusted_image_path and path.isfile(self.adjusted_image_path):
                 try:
                     remove(self.adjusted_image_path)
                     print(f"Cleaned up temporary file: {self.adjusted_image_path}")
+                    self.adjusted_image_path = None
                 except Exception as e:
                     print(f"Warning: Could not delete temporary file: {e}")
 
