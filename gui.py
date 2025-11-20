@@ -776,9 +776,15 @@ HTML = """
         }
 
         .btn-toggle {
+            padding: 10px 20px;
+            font-size: 12px;
+            font-weight: 600;
             background: #1a1a1a;
             color: #808080;
-            position: relative;
+            border: 1px solid #808080;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
         }
 
         .btn-toggle.active {
@@ -787,14 +793,12 @@ HTML = """
             border-color: #5588dd;
         }
 
-        .btn-toggle::before {
-            content: '○';
-            margin-right: 8px;
-            font-size: 16px;
+        .btn-toggle:hover {
+            opacity: 0.8;
         }
 
-        .btn-toggle.active::before {
-            content: '●';
+        .btn-toggle:active {
+            opacity: 0.6;
         }
 
         .btn-primary {
@@ -1167,6 +1171,10 @@ HTML = """
             <symbol id="icon-undo" viewBox="0 0 512 512">
                 <path fill="currentColor" d="M48.5 224H40c-13.3 0-24-10.7-24-24V72c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2L98.6 96.6c87.6-86.5 228.7-86.2 315.8 1c87.5 87.5 87.5 229.3 0 316.8s-229.3 87.5-316.8 0c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0c62.5 62.5 163.8 62.5 226.3 0s62.5-163.8 0-226.3c-62.2-62.2-162.7-62.5-225.3-1L185 183c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8H48.5z"/>
             </symbol>
+            <!-- Question/Help Icon -->
+            <symbol id="icon-question" viewBox="0 0 512 512">
+                <path fill="currentColor" d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM169.8 165.3c7.9-22.3 29.1-37.3 52.8-37.3h58.3c34.9 0 63.1 28.3 63.1 63.1c0 22.6-12.1 43.5-31.7 54.8L280 264.4c-.2 13-10.9 23.6-24 23.6c-13.3 0-24-10.7-24-24V250.5c0-8.6 4.6-16.5 12.1-20.8l44.3-25.4c4.7-2.7 7.6-7.7 7.6-13.1c0-8.4-6.8-15.1-15.1-15.1H222.6c-3.4 0-6.4 2.1-7.5 5.3l-.4 1.2c-4.4 12.5-18.2 19-30.6 14.6s-19-18.2-14.6-30.6l.4-1.2zM224 352a32 32 0 1 1 64 0 32 32 0 1 1 -64 0z"/>
+            </symbol>
         </defs>
     </svg>
 
@@ -1225,6 +1233,9 @@ HTML = """
                         </button>
                         <button class="btn-toggle" id="lightModeButton" onclick="toggleLightMode()">LIGHT MODE</button>
                         <button class="btn-primary" id="generateBtn" onclick="generateColors()">GENERATE COLORS</button>
+                        <button class="btn-icon" title="Help">
+                            <svg class="icon"><use xlink:href="#icon-question" href="#icon-question"/></svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1419,9 +1430,15 @@ HTML = """
             // Update light mode toggle button
             const lightModeButton = document.getElementById('lightModeButton');
             if (lightModeButton) {
-                lightModeButton.style.backgroundColor = accent;
-                lightModeButton.style.borderColor = accent;
-                lightModeButton.style.color = '#ffffff';
+                if (lightModeButton.classList.contains('active')) {
+                    lightModeButton.style.backgroundColor = accent;
+                    lightModeButton.style.borderColor = accent;
+                    lightModeButton.style.color = '#ffffff';
+                } else {
+                    lightModeButton.style.backgroundColor = bg;
+                    lightModeButton.style.borderColor = fg;
+                    lightModeButton.style.color = fg;
+                }
             }
 
             // Update template toggle buttons (active and inactive)
