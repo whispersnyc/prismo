@@ -1892,13 +1892,15 @@ HTML = """
                     updateColorGrid(result.colors);
                     updateTheme(result.colors);
 
-                    // Show results popup if templates or WSL were applied
+                    // Show results popup if templates, WSL, or Firefox were applied
                     const hasTemplateResults = result.template_results &&
                         (result.template_results.succeeded.length > 0 || result.template_results.failed.length > 0);
                     const hasWSLResults = result.template_results &&
                         (result.template_results.wsl_succeeded.length > 0 || result.template_results.wsl_failed.length > 0);
+                    const hasFirefoxResults = result.template_results &&
+                        result.template_results.pywalfox_attempted;
 
-                    if (hasTemplateResults || hasWSLResults) {
+                    if (hasTemplateResults || hasWSLResults || hasFirefoxResults) {
                         showResultsPopup(result.template_results);
                     } else {
                         showMessage('Colors generated successfully!', 'success');
@@ -1994,6 +1996,32 @@ HTML = """
                 html += '</div>';
             }
 
+            // Firefox section
+            if (results.pywalfox_attempted) {
+                html += '<div class="results-category-header">Firefox</div>';
+
+                if (results.pywalfox_success) {
+                    html += '<div class="results-section">';
+                    html += '<div class="results-section-title success">✓ Successfully Updated</div>';
+                    html += '<ul class="results-list">';
+                    html += '<li class="results-item success">';
+                    html += '<div class="results-item-name">Pywalfox extension</div>';
+                    html += '</li>';
+                    html += '</ul>';
+                    html += '</div>';
+                } else {
+                    html += '<div class="results-section">';
+                    html += '<div class="results-section-title error">✗ Update Failed</div>';
+                    html += '<ul class="results-list">';
+                    html += '<li class="results-item failed">';
+                    html += '<div class="results-item-name">Pywalfox extension</div>';
+                    html += '<div class="results-item-error">Extension not installed or python module not found</div>';
+                    html += '</li>';
+                    html += '</ul>';
+                    html += '</div>';
+                }
+            }
+
             // Summary
             const templateTotal = (results.succeeded ? results.succeeded.length : 0) + (results.failed ? results.failed.length : 0);
             const templateSuccess = results.succeeded ? results.succeeded.length : 0;
@@ -2009,6 +2037,12 @@ HTML = """
             }
             if (hasWSLResults) {
                 html += 'WSL Distros: ' + wslSuccess + ' of ' + wslTotal + ' applied successfully';
+            }
+            if ((hasTemplateResults || hasWSLResults) && results.pywalfox_attempted) {
+                html += '<br>';
+            }
+            if (results.pywalfox_attempted) {
+                html += 'Firefox: ' + (results.pywalfox_success ? 'Updated successfully' : 'Failed to update');
             }
             html += '</div>';
 

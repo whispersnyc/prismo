@@ -70,7 +70,9 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         "succeeded": [],
         "failed": [],
         "wsl_succeeded": [],
-        "wsl_failed": []
+        "wsl_failed": [],
+        "pywalfox_success": False,
+        "pywalfox_attempted": False
     }
 
     # get/create color scheme
@@ -89,11 +91,14 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
     # pywalfox update - check config or parameter
     should_update_pywalfox = pywalfox if pywalfox is not None else active_config.get("pywalfox", False)
     if should_update_pywalfox:
+        results["pywalfox_attempted"] = True
         try:
             Popen(["python", "-m", "pywalfox", "update"])
+            results["pywalfox_success"] = True
             print("Pywalfox updated")
-        except Exception:
-            print("Pywalfox not updated")
+        except Exception as e:
+            results["pywalfox_success"] = False
+            print(f"Pywalfox not updated: {e}")
 
     # process color scheme
     wal["colors"].update(wal["special"])
