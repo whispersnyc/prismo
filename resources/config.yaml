@@ -2,7 +2,7 @@ templates:
     obsidian: '%userprofile%\Documents\Notes\.obsidian\themes\pywal.css'
 disabled:
     win-terminal: '%localappdata%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
-    alacritty: '~\alacritty\alacritty.totml'
-wsl: []
+wsl_distros:
 wsl_enabled: false
 light_mode: false
+pywalfox: false

@@ -10,19 +10,37 @@ from config_manager import load_config, home, config_path
 
 
 def save_config(config_dict, file_path):
-    """Save config with inline list format for WSL distros"""
-    # Custom representer to make lists use flow style (inline format)
-    class FlowStyleListDumper(yaml.SafeDumper):
+    """Save config with newline list format for templates, disabled, wsl_distros"""
+    class CustomDumper(yaml.SafeDumper):
         pass
 
-    def represent_list(dumper, data):
-        # Use flow style for lists (inline: [item1, item2])
-        return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
+    def represent_dict(dumper, data):
+        # Use block style for dicts
+        return dumper.represent_mapping('tag:yaml.org,2002:map', data, flow_style=False)
 
-    FlowStyleListDumper.add_representer(list, represent_list)
+    def represent_list(dumper, data):
+        # Use block style for lists (newline format)
+        return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=False)
+
+    CustomDumper.add_representer(dict, represent_dict)
+    CustomDumper.add_representer(list, represent_list)
+
+    # Dump to string first
+    yaml_content = yaml.dump(config_dict, Dumper=CustomDumper, default_flow_style=False, sort_keys=False)
+
+    # Post-process to replace empty dicts/lists with just the key
+    lines = yaml_content.split('\n')
+    result_lines = []
+    for line in lines:
+        # Replace "key: {}" with "key:" and "key: []" with "key:"
+        if ': {}' in line or ': []' in line:
+            line = line.replace(': {}', ':').replace(': []', ':')
+        result_lines.append(line)
+
+    yaml_content = '\n'.join(result_lines)
 
     with open(file_path, 'w') as f:
-        yaml.dump(config_dict, f, Dumper=FlowStyleListDumper, default_flow_style=False, sort_keys=False)
+        f.write(yaml_content)
 
 
 class PrismoAPI:
@@ -57,7 +75,7 @@ class PrismoAPI:
             # Initialize all templates as active by default
             self.active_templates = set(self.config.get("templates", {}).keys())
             # Initialize WSL distros from config
-            self.wsl_distros = self.config.get("wsl", [])
+            self.wsl_distros = self.config.get("wsl_distros", [])
             # Initialize WSL enabled state from config
             self.wsl_enabled = self.config.get("wsl_enabled", False)
             # Initialize light mode from config
@@ -158,7 +176,7 @@ class PrismoAPI:
     def set_wsl_distros(self, distros):
         """Set WSL distros and persist to config"""
         self.wsl_distros = distros if isinstance(distros, list) else []
-        self.config["wsl"] = self.wsl_distros
+        self.config["wsl_distros"] = self.wsl_distros
 
         # Save config to file
         try:
@@ -432,8 +450,8 @@ class PrismoAPI:
                 self.adjusted_image_path = None
 
             # Generate colors with selected templates and WSL
-            apply_config = len(self.active_templates) > 0 or len(self.wsl_distros) > 0
-            wsl_setting = self.wsl_distros if len(self.wsl_distros) > 0 else None
+            apply_config = len(self.active_templates) > 0 or (self.wsl_enabled and len(self.wsl_distros) > 0)
+            wsl_setting = self.wsl_distros if self.wsl_enabled and len(self.wsl_distros) > 0 else None
             template_results = gen_colors(
                 adjusted_image_path,
                 apply_config=apply_config,

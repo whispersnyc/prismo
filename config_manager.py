@@ -161,7 +161,20 @@ def load_config(force_reload=False, custom_config_path=None):
         if path.isfile(config_path):
             with open(config_path) as c:
                 config = yaml.safe_load(c)
-                return config if config else {}
+                if not config:
+                    config = {}
+
+                # Normalize empty values for dict/list fields
+                # When YAML has "key:" with no value, it loads as None
+                # Convert these to empty dicts/lists as appropriate
+                if config.get("templates") is None:
+                    config["templates"] = {}
+                if config.get("disabled") is None:
+                    config["disabled"] = {}
+                if config.get("wsl_distros") is None:
+                    config["wsl_distros"] = []
+
+                return config
         else:
             print(f"Warning: Config file not found at {config_path}")
             return {}
@@ -187,7 +200,7 @@ def get_config_info():
         "template_count": len(config.get("templates", {})),
         "templates": list(config.get("templates", {}).keys()),
         "wsl_enabled": config.get("wsl_enabled", False),
-        "wsl_distros": config.get("wsl", []),
+        "wsl_distros": config.get("wsl_distros", []),
         "light_mode": config.get("light_mode", False)
     }
 

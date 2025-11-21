@@ -116,8 +116,11 @@ def gen_colors(img, apply_config=True, light_mode=False, templates=None, wsl=Non
         # wsl argument was provided (should be a list)
         wsl_distros = wsl if isinstance(wsl, list) else []
     else:
-        # wsl argument not provided, check config
-        wsl_distros = active_config.get("wsl", [])
+        # wsl argument not provided, check config but respect wsl_enabled flag
+        if active_config.get("wsl_enabled", False):
+            wsl_distros = active_config.get("wsl_distros", [])
+        else:
+            wsl_distros = []
 
     # Apply to each distro
     for wsl_distro in wsl_distros:
@@ -254,8 +257,11 @@ def main(test_args=None, test_config=None, custom_config_path=None):
             help="override config and apply specific templates (comma-separated list, e.g., 'discord,obsidian'). "
                  "If no list provided, prints available templates and config path, then exits")
     parser.add_argument("-w", "--wsl", nargs="?", const="__use_config__", default=None,
-            help="override config and apply WSL/wpgtk theme. Accepts comma-separated distro names (e.g., 'Ubuntu,Debian'), "
-                 "'true' to use config distros, or 'false' to disable")
+            help="control WSL/wpgtk theme application. No flag: respects config (applies only if wsl_enabled=true). "
+                 "With no args or 'true': applies to all config distros (ignores wsl_enabled). "
+                 "With 'false': disables WSL regardless of config. "
+                 "With distro names: applies to specified distros (ignores wsl_enabled). "
+                 "Example: -w, -w true, -w false, -w Ubuntu,Debian")
     parser.add_argument("-p", "--pywalfox", nargs="?", const=True, default=None, type=lambda x: x.lower() in ['true', '1', 'yes'],
             help="override config and update pywalfox extension. With no arguments: enables. "
                  "With 'true'/'false' argument: explicitly enable/disable")
@@ -318,18 +324,20 @@ def main(test_args=None, test_config=None, custom_config_path=None):
     wsl_distros = None
     if args.wsl is not None:
         # Flag was explicitly provided
-        if args.wsl == "__use_config__":
-            # -w with no arguments: use config distros (ignores wsl_enabled flag)
-            wsl_distros = config.get("wsl", [])
-        elif args.wsl.lower() == "true":
-            # -w true: use config distros (ignores wsl_enabled flag)
-            wsl_distros = config.get("wsl", [])
+        if args.wsl == "__use_config__" or args.wsl.lower() == "true":
+            # -w (no args) or -w true: ignore wsl_enabled, apply to all config wsl_distros
+            wsl_distros = config.get("wsl_distros", [])
         elif args.wsl.lower() == "false":
-            # -w false: explicitly disable WSL
+            # -w false: explicitly disable WSL regardless of config
             wsl_distros = []
         else:
-            # CSV argument provided, parse it as explicit distro list
+            # CSV argument provided: parse as explicit distro list and apply (ignore wsl_enabled)
             wsl_distros = [d.strip() for d in args.wsl.split(",") if d.strip()]
+    else:
+        # No flag provided: follow config directives (respect wsl_enabled)
+        if config.get("wsl_enabled", False):
+            wsl_distros = config.get("wsl_distros", [])
+        # If wsl_enabled is false, wsl_distros stays None (will not apply)
 
     # If only --headless flag was provided, process normally (will generate from current wallpaper)
     # Otherwise continue with normal CLI behavior
