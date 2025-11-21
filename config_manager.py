@@ -186,7 +186,7 @@ def get_config_info():
         "template_path": template_path,
         "template_count": len(config.get("templates", {})),
         "templates": list(config.get("templates", {}).keys()),
-        "wsl_enabled": bool(config.get("wsl", [])),
+        "wsl_enabled": config.get("wsl_enabled", False),
         "wsl_distros": config.get("wsl", []),
         "light_mode": config.get("light_mode", False)
     }

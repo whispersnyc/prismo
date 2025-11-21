@@ -247,22 +247,32 @@ def main(test_args=None, test_config=None, custom_config_path=None):
     parser.add_argument("-c", "--config", type=str, default=None,
             help="path to custom config folder containing config.yaml and templates/ (default: %%LOCALAPPDATA%%\\Prismo)")
     parser.add_argument("-co", "--colors-only", action="store_true",
-            help="generate colors and format JSON only, skip config-based templates and WSL")
+            help="generate colors and format JSON only. Takes precedence: ignores all config unless -t, -w, or -p flags are also specified")
     parser.add_argument("-lm", "--light-mode", action="store_true",
-            help="generate light mode color scheme instead of dark mode")
+            help="override config and generate light mode color scheme instead of dark mode")
     parser.add_argument("-t", "--templates", nargs="?", const="__list__", default=None,
-            help="apply specific templates (comma-separated list, e.g., 'discord,obsidian'). "
+            help="override config and apply specific templates (comma-separated list, e.g., 'discord,obsidian'). "
                  "If no list provided, prints available templates and config path, then exits")
     parser.add_argument("-w", "--wsl", nargs="?", const="__use_config__", default=None,
-            help="apply WSL/wpgtk theme. Accepts comma-separated distro names (e.g., 'Ubuntu,Debian'). "
-                 "With no arguments: uses config value. "
-                 "With arguments: applies to specified distros (overrides config)")
+            help="override config and apply WSL/wpgtk theme. Accepts comma-separated distro names (e.g., 'Ubuntu,Debian'), "
+                 "'true' to use config distros, or 'false' to disable")
     parser.add_argument("-p", "--pywalfox", nargs="?", const=True, default=None, type=lambda x: x.lower() in ['true', '1', 'yes'],
-            help="update pywalfox extension. With no arguments: enables pywalfox. "
-                 "With arguments: true/false to enable/disable (overrides config)")
+            help="override config and update pywalfox extension. With no arguments: enables. "
+                 "With 'true'/'false' argument: explicitly enable/disable")
     parser.add_argument("filepath", nargs="?", default=None,
             help="optional path to image file (if not provided, uses current wallpaper)")
     args = parser.parse_args(test_args)
+
+    # -co flag takes precedence over other flags (except -h which exits before this)
+    # When -co is used alone, it clears other flag overrides
+    if args.colors_only:
+        # Reset all override flags unless explicitly used
+        if args.templates is None and args.wsl is None and args.pywalfox is None:
+            # -co used alone with no other flags: ignore all overrides
+            args.templates = None
+            args.wsl = None
+            args.pywalfox = None
+            args.light_mode = False
 
     # Handle custom config path
     if args.config:
@@ -304,21 +314,27 @@ def main(test_args=None, test_config=None, custom_config_path=None):
         print(f"\nConfig file location: {config_path}")
         sys.exit(0)
 
-    # Parse WSL distros - support comma-separated list
+    # Parse WSL distros - support comma-separated list or explicit true/false
     wsl_distros = None
     if args.wsl is not None:
-        # Flag was used
+        # Flag was explicitly provided
         if args.wsl == "__use_config__":
-            # --wsl with no arguments, use config
+            # -w with no arguments: use config distros (ignores wsl_enabled flag)
             wsl_distros = config.get("wsl", [])
+        elif args.wsl.lower() == "true":
+            # -w true: use config distros (ignores wsl_enabled flag)
+            wsl_distros = config.get("wsl", [])
+        elif args.wsl.lower() == "false":
+            # -w false: explicitly disable WSL
+            wsl_distros = []
         else:
-            # CSV argument provided, parse it
+            # CSV argument provided, parse it as explicit distro list
             wsl_distros = [d.strip() for d in args.wsl.split(",") if d.strip()]
 
     # If only --headless flag was provided, process normally (will generate from current wallpaper)
     # Otherwise continue with normal CLI behavior
 
-    # determine light mode: flag takes priority over config, default to False
+    # determine light mode: explicit flag overrides config value
     light_mode = args.light_mode if args.light_mode else config.get("light_mode", False)
 
     # use provided filepath or get current wallpaper
@@ -345,9 +361,11 @@ def main(test_args=None, test_config=None, custom_config_path=None):
     # generate colors and apply config
     try:
         # Determine which templates to apply
+        # If -t flag is explicitly provided (with argument), use those templates
+        # If -t is not provided, use all enabled templates from config
         templates_to_apply = None
         if args.templates and args.templates != "__list__":
-            # Parse comma-separated template list
+            # Parse comma-separated template list from explicit flag
             templates_to_apply = set(t.strip() for t in args.templates.split(","))
 
             # Create combined templates dict (enabled + disabled) for CLI usage

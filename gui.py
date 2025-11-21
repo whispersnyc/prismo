@@ -58,6 +58,8 @@ class PrismoAPI:
             self.active_templates = set(self.config.get("templates", {}).keys())
             # Initialize WSL distros from config
             self.wsl_distros = self.config.get("wsl", [])
+            # Initialize WSL enabled state from config
+            self.wsl_enabled = self.config.get("wsl_enabled", False)
             # Initialize light mode from config
             self.light_mode = self.config.get("light_mode", False)
             # Initialize pywalfox from config
@@ -104,7 +106,8 @@ class PrismoAPI:
         # Always return WSL info (even if empty)
         wsl_info = {
             "distros": self.wsl_distros,
-            "active": len(self.wsl_distros) > 0
+            "active": self.wsl_enabled,
+            "enabled": self.wsl_enabled
         }
 
         return {
@@ -167,6 +170,22 @@ class PrismoAPI:
             self.load_config()
 
         return self.wsl_distros
+
+    def toggle_wsl(self):
+        """Toggle WSL enabled/disabled state and persist to config"""
+        self.wsl_enabled = not self.wsl_enabled
+        self.config["wsl_enabled"] = self.wsl_enabled
+
+        # Save config to file
+        try:
+            save_config(self.config, config_path)
+            print(f"Updated config: wsl_enabled = {self.wsl_enabled}")
+        except Exception as e:
+            print(f"Error saving config: {e}")
+            # Revert changes on error
+            self.load_config()
+
+        return self.wsl_enabled
 
     def open_config_in_editor(self):
         """Open config file in default editor"""
@@ -1638,12 +1657,16 @@ HTML = """
                 // Always add WSL button
                 if (configInfo.wsl) {
                     const button = document.createElement('button');
-                    button.className = 'btn-template' + (configInfo.wsl.active ? ' active' : '');
+                    button.className = 'btn-template' + (configInfo.wsl.enabled ? ' active' : '');
                     const distroCount = configInfo.wsl.distros.length;
                     button.textContent = distroCount > 0
                         ? `WSL (${distroCount} ${distroCount === 1 ? 'DISTRO' : 'DISTROS'})`
                         : 'WSL (NONE)';
-                    button.onclick = () => openWSLModal();
+                    button.onclick = () => toggleWSL(button);
+                    button.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        openWSLModal();
+                    };
                     templateButtons.appendChild(button);
                 }
 
@@ -1724,6 +1747,19 @@ HTML = """
             } catch (e) {
                 console.error('Error toggling template:', e);
                 showMessage('Error toggling template', 'error');
+            }
+        }
+
+        // Toggle WSL enabled/disabled state
+        async function toggleWSL(button) {
+            try {
+                const isNowEnabled = await pywebview.api.toggle_wsl();
+
+                // Reload all buttons to reflect new state from config
+                await loadTemplateButtons();
+            } catch (e) {
+                console.error('Error toggling WSL:', e);
+                showMessage('Error toggling WSL', 'error');
             }
         }
 
